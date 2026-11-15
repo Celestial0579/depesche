@@ -3,6 +3,7 @@ import io
 import os
 import sys
 import unittest
+import unittest.mock
 
 HIER = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HIER)
@@ -16,12 +17,90 @@ class DepescheTest(unittest.TestCase):
     def setUpClass(cls):
         cls.g = depesche.lade_glossar(BEISPIEL)
 
+    def probe(self, name):
+        with open(os.path.join(HIER, "messung", name), encoding="utf-8") as f:
+            return depesche.pruefe(f.read(), self.g)
+
     def test_proben_sind_gueltig(self):
-        for name in ("d.txt", "e.txt"):
-            with open(os.path.join(HIER, "messung", name), encoding="utf-8") as f:
-                fehler, hinweise = depesche.pruefe(f.read(), self.g)
-            self.assertEqual(fehler, [], name)
-            self.assertEqual(hinweise, [], name)
+        for name in ("d.txt", "e.txt", "e2.txt"):
+            self.assertEqual(self.probe(name)[0], [], name)
+
+    def test_e2_folgt_dem_telegrammstil(self):
+        self.assertEqual(self.probe("e2.txt")[1], [])
+
+    def test_e_hat_noch_stilhinweise(self):
+        hinweise = self.probe("e.txt")[1]
+        self.assertTrue(any(h.startswith("Stil (en)") for h in hinweise))
+        self.assertTrue(any("länger als" in h for h in hinweise))
+
+    def test_stil_englisch(self):
+        _, hinweise = depesche.pruefe("DP1 DO fix\n- please just check the updater, part A first\n", self.g)
+        stil = [h for h in hinweise if h.startswith("Stil (en)")]
+        self.assertEqual(len(stil), 1)
+        self.assertIn("please, just, the", stil[0])
+        self.assertNotIn(" a,", stil[0])
+
+    def test_stil_deutsch(self):
+        _, hinweise = depesche.pruefe("DP1 DO fix\n- bitte den Updater prüfen und dann mal bauen\n", self.g)
+        self.assertTrue(any(h.startswith("Stil (de): bitte, den, mal") for h in hinweise))
+
+    def test_stil_ignoriert_code_zitate_pfade(self):
+        text = 'DP1 DO fix\n- run `git log --the a` + send "the end", see a/the/x.md\n'
+        self.assertEqual(depesche.pruefe(text, self.g)[1], [])
+
+    def test_klartext_ohne_stilpruefung(self):
+        text = "DP1 FYI risk\n!!\nThe script deletes the whole disk. Please confirm.\n\nnext wait\n"
+        self.assertEqual(depesche.pruefe(text, self.g)[1], [])
+
+    def test_lange_zeile_und_zeilenanfang(self):
+        text = "DP1 DO x\n- " + "word " * 40 + "\nsomething without field\n"
+        fehler, hinweise = depesche.pruefe(text, self.g)
+        self.assertEqual(fehler, [])
+        self.assertTrue(any("länger als 160" in h for h in hinweise))
+        self.assertTrue(any("weder mit Feld" in h for h in hinweise))
+
+    def test_hinweise_aendern_rueckgabewert_nicht(self):
+        class A:
+            datei = []
+        with contextlib.redirect_stdout(io.StringIO()), unittest.mock.patch("sys.stdin", io.StringIO("DP1 DO x\n- the a\n")):
+            self.assertEqual(depesche.check(A, self.g), 0)
+        with contextlib.redirect_stdout(io.StringIO()), unittest.mock.patch("sys.stdin", io.StringIO("DP1 XX\n")):
+            self.assertEqual(depesche.check(A, self.g), 1)
+
+    def test_tabelle_letzte_spalte_nimmt_rest(self):
+        u = depesche.Uebersetzer(self.g, "de")
+        zeilen = u.block(["T repo,note", "a,ok, CI green, 2 PRs"])
+        self.assertEqual(zeilen[1], "  repo=a, note=ok, CI green, 2 PRs")
+        _, hinweise = depesche.pruefe("DP1 FYI x\nT repo,ci,note\na,ok\n", self.g)
+        self.assertTrue(any("weniger als 3 Spalten" in h for h in hinweise))
+
+    def test_backticks_bleiben_woertlich(self):
+        u = depesche.Uebersetzer(self.g, "de")
+        self.assertEqual(u.text("`echo $N R push` + $N"), "`echo $N R push` + ~/notizen/teamleiter")
+        fehler, _ = depesche.pruefe("DP1 DO x\n- run `echo $Q R xyz`\n", self.g)
+        self.assertEqual(fehler, [])
+
+    def test_kennung_im_klartext_beginnt_keine_nachricht(self):
+        b = depesche.bloecke("DP1 FYI x\n!!\nDP1 is just a word here.\n\nnext y\n")
+        self.assertEqual(len(b), 1)
+
+    def test_trennzeile_gehoert_zu_keiner_nachricht(self):
+        b = depesche.bloecke("=== S1\nDP1 GO vm\n=== S2\nDP1 GO x\n")
+        self.assertEqual([k for k, _ in b], [None, "DP1 GO vm", None, "DP1 GO x"])
+
+    def test_stats_mit_leerer_erster_datei(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            leer, voll = os.path.join(d, "0"), os.path.join(d, "1")
+            open(leer, "w").close()
+            with open(voll, "w") as f:
+                f.write("DP1 GO x\n")
+
+            class A:
+                datei = [leer, voll]
+            with contextlib.redirect_stdout(io.StringIO()) as aus:
+                depesche.stats(A, self.g)
+        self.assertIn("0 Zeichen", aus.getvalue())
 
     def test_fehler_werden_erkannt(self):
         fehler, hinweise = depesche.pruefe("DP1 REP\nR push,xyz\nsiehe $Q → fertig\n", self.g)
@@ -62,6 +141,8 @@ class DepescheTest(unittest.TestCase):
         text = puffer.getvalue()
         self.assertTrue(text.startswith("---\nname: depesche\n"))
         self.assertIn("- rules: push=", text)
+        self.assertIn("; next;", text)  # Code ohne eigene Erklärung
+        self.assertLess(len(text), 2600)
         self.assertNotIn("{{", text)
 
 

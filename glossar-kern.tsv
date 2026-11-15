@@ -1,12 +1,12 @@
 # Allgemeiner Teil: für jedes Team gleich. Spalten: Code<TAB>Art<TAB>Deutsch<TAB>Englisch
 DO	typ	Auftrag	order
-ASK	typ	Frage (Antwort nötig)	question (answer needed)
+ASK	typ	Frage (Antwort nötig)	question, needs ANS
 ANS	typ	Antwort	answer
 REP	typ	Bericht	report
 GO	typ	Freigabe	go-ahead
 NO	typ	Ablehnung	refusal
-STOP	typ	Sofort anhalten, Stand sichern, warten	stop now, save state, wait
-FYI	typ	Zur Kenntnis (keine Antwort)	info (no reply)
+STOP	typ	Sofort anhalten, Stand sichern, warten	stop, save state, wait
+FYI	typ	Zur Kenntnis (keine Antwort)	info, no reply
 ok	status	erledigt	done
 part	status	teilweise erledigt	partly done
 fail	status	gescheitert	failed
@@ -25,6 +25,7 @@ R	feld	Regeln	rules
 T	feld	Tabelle	table
 ->	zeichen	dann, führt zu	then, leads to
 +	zeichen	und	and
+/	zeichen	oder	or
 =	zeichen	ist, gesetzt auf	is, set to
 ~	zeichen	etwa	about
 ?	zeichen	unklar	unknown
