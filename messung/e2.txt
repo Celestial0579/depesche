@@ -1,0 +1,48 @@
+=== S1
+DP1 GO vm #46 #48
+now 22:24 no vm, 12.6G free. R vm
+next vm off -> send widgettea-110 "DP1 GO vm"; REP 1 line
+DO audit
+- pin actions by SHA + ver comment: ci.yml checkout@v7 setup-dotnet@v6, release.yml same + upload-artifact@v7
+- dependabot.yml must cover github-actions. own PR or with #46/#48. R push
+- v0.2.4 lacks checksum file -> next rel: SHA256SUMS asset, ideally attest-build-provenance
+- $N/windows-pruefliste.md: check, gaps only, part A first (updater checks SHA-256?), gap -> issue. fits -> vm run, rest next rel
+FYI #45 #35 #36 -> asking boss
+=== S2
+DP1 DO dependabot#16
+FYI DSU on now
+- #16 low: npm/deepmerge in tools/web-ext/package-lock.json, prototype poisoning in mergeObject(), no patched ver
+- try newer web-ext or overrides
+- impossible + not exploitable (build tool only, no foreign input): dismiss as tolerable risk with reason + recheck issue
+- AMO zip 1.1.0 stays, boss uploads exactly this file
+- dependabot PRs: review, merge on green CI only
+DO $N/windows-pruefliste.md: check, gaps only -> #47 or own issue, impl after 1.1.0, part A first (local API, updater)
+=== S3
+DP1 DO handover
+src boss: p2v-stick (bare metal -> Proxmox VM, ~/Management/p2v-stick) = 4th path in rescue assistant, name project-B
+why new session does rename + port; your ctx 66% -> every step costly
+- let beta .6 finish (build 21:12Z still running 22:23), then ci-gruen-pruefen.sh
+- 1 PR: node-24 actions by SHA (as resolved) + .github/dependabot.yml (github-actions)
+- same PR: SECURITY.md (-> private vuln reporting, on since today, no SLA/CVE promises). R push
+- wait PR build, merge on green, no new beta
+- write $N/uebergabe-projekt-b.md, dense, no secrets:
+- layout (rescue/lib, rescue/bin, build, packages.list, CI selftest)
+- safety rules new path must follow (safety.sh, target confirm); where assistant offers 3 paths
+- release + beta flow (numbering, attestation, verify cmd); open #54 #34 + traps
+- every hardcoded "firestrike" (ISO name, banner, GRUB, docs, verify cmd, frs- prefix, sudoers)
+- no rename, no p2v work. R name
+next REP when 1-3 done -> tl starts project-B session + archives you
+=== S4
+DP1 FYI src boss 22:30, act after vm run
+- #45: option A, var GH_DEPENDENCY_SUBMISSION_SKIP_CACHE=true set by tl, no other repo affected
+- next main push: verify dependency submission w/o warning -> close #45 with run link
+- #35 #36: build both, start >=1118 after quota reset, #36 first. note decision in both issues (1 sentence, R priv). no start before
+- main: ruleset protect-default-branch (no delete/force-push), normal push + merge ok
+=== S5
+DP1 REP part #46 #48
+did local commits, not pushed: #46 @de98b11 dir ACL outside profile (warn + user/SYSTEM/admins only; Test-Installer step 5: drive-root dir)
+did #48 @52bef30 (on #46): key -> Software\Celestial0579\Lagerfeuer, update takes InstallDir from old key, deletes it; uninstall deletes both + empty parent
+ci local: build 0 warn, 559 tests green, pwsh parse ok. app unchanged, step 6 tests move. setup needs vm (no NSIS on host)
+now ready: skripte/lauf-46-48.sh (build 0.2.5, Test-Installer -SkipOld as user), update-024.ps1 (0.2.4 -> default/profile/drive-root dir, checksum ok)
+next after vm: push each branch once, open 2 PRs
+need vm window. #45 waits boss

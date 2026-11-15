@@ -1,30 +1,23 @@
-# {{NAME}} {{KENNUNG}}: compact messages between team lead (TL) and staff sessions
+# {{NAME}} {{KENNUNG}}
 
-Use for every SendMessage between TL and staff sessions, and to read any message starting with `{{KENNUNG}}`. Never for text the human operator reads: chat, wrap_up recap, operator to-do lists, issues, PRs, commits stay normal language.
+All SendMessage TL <-> staff, msgs starting `{{KENNUNG}}`. Not text humans read (chat, wrap_up, issues, PRs, commits).
 
 Format
-- Line 1: `{{KENNUNG}} TYPE [status] [subject/refs] [!]`. Then one item per line: `field value` or `- item`.
-- Free text: terse English. No greeting, filler, articles, hedging, restating known context. Fragments ok.
-- Refs, not content: #n issue, !n PR, @sha commit, repo#n, vX.Y.Z, file path, session name (send by name, not id).
-- ASCII only: -> then, + and, = is/set, ~ about, ? unknown. No emoji, unicode arrows or bullets (cost more tokens).
-- Time HH:MM local, Z = UTC, date MMDD.
-- Uniform records as table: `T col1,col2` then one CSV row per line.
-- `R code,code`: stress standing rules. All rules always apply, R only reminds.
+- `{{KENNUNG}} TYPE [status] [refs/subject] [!]`, status only after REP, `!` urgent. Then 1 item/line: `field value`, `TYPE text`, `- item`, table row.
+- `T col,col` + CSV rows, last col takes rest, blank line ends. `R code,..` reminds rules, all apply always. `$X` path.
+- Refs not content: #n issue, !n PR, @sha, repo#n, vX.Y.Z, path, session name not id.
+- ASCII only: -> then, + and, / or, = is/set, ~ about, ? unknown. HH:MM local, Z=UTC, date MMDD.
+- Free text telegram English: no articles, filler, politeness, hedging, known ctx. Abbrev ok: cfg dir env dep impl req resp msg fn arg repo ver doc auth perm tmp.
+  bad "I have pushed the fix and the CI is green now." good `did fix pushed, ci green`
+  bad "Could you please check whether the updater verifies the hash?" good `- check updater verifies hash?`
 
 Behavior
-1. One message per event, batch items. No ACK; silence = accepted.
-2. At task end or when blocked: `REP status`, then did/now/next/need, max 6 lines. TL often reads only the first 400 chars.
-3. Ask only when blocked. Other info goes into the next REP.
-4. Line `!!`, then full clear sentences: security findings, destructive or irreversible steps, decisions for the operator, permissions. Exact beats short.
-5. Verbatim: code, commands, paths, error text, IDs.
+1. 1 msg per event, batch items. No ACK; silence = accepted.
+2. Done/blocked: `REP status` + did/now/next/need, max 6 lines, key facts in first 400 chars.
+3. Ask only when blocked; rest into next REP.
+4. `!!` line -> exact full sentences until blank line: security findings, irreversible steps, operator decisions, permissions.
+5. Verbatim: code, cmds, paths, errors, IDs. `backticks` never expand.
 6. Unknown code: `{{KENNUNG}} ASK ?code`.
-
-Example
-```
-{{KENNUNG}} REP blk #48
-did key moved to Software\Celestial0579\App, uninstall cleans, 559 tests green
-need vm window
-```
 
 Glossary
 {{GLOSSAR}}

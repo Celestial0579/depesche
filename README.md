@@ -1,6 +1,6 @@
 # Depesche
 
-*English summary: Depesche (`DP1`) is a compact, ASCII-only message protocol for a team of Claude Code sessions: one lead session and the sessions it directs. Messages use eight fixed types, short fields, references instead of copied content, and codes for standing rules. On real messages it needed about half the tokens of normal prose. A stdlib-only Python tool expands messages to plain German or English, checks them and builds the Claude Code skill. Docs below are in German.*
+*English summary: Depesche (`DP1`) is a compact, ASCII-only message protocol for a team of Claude Code sessions: one lead session and the sessions it directs. Messages use eight fixed types, short fields, telegram-style English, references instead of copied content, and codes for standing rules. On real messages it needs about two thirds of the tokens of normal prose; the generated skill file shrank by 30 % in tokens. A stdlib-only Python tool expands messages to plain German or English, checks structure and style, and builds the Claude Code skill. Docs below are in German.*
 
 Depesche ist eine Kurzsprache für die Nachrichten zwischen einer Leitsitzung (Teamleiter) und den Claude-Sitzungen, die ihr unterstehen. Sie spart Tokens, lässt sich trotzdem in Klartext übersetzen und ist für andere Teams wiederverwendbar.
 
@@ -8,24 +8,28 @@ Der Name kommt vom Telegramm: Bezahlt wurde pro Wort, deshalb schrieb man knapp.
 
 ## Was es bringt
 
-Gemessen wurden fünf echte Nachrichten aus einem Team von Claude-Code-Sitzungen: vier Aufträge des Teamleiters und ein Bericht. Die Texte liegen in `messung/`. Namen und Pfade sind dort nach der Messung anonymisiert, die Zeichenzahlen beziehen sich auf die anonymisierte Fassung.
+Messgrundlage: fünf echte Nachrichten aus einem Team von Claude-Code-Sitzungen, vier Aufträge des Teamleiters und ein Bericht. Die Texte liegen in `messung/`, Namen und Pfade nach der Messung anonymisiert.
 
-| Fassung | Zeichen | Tokens gegenüber bisher |
-|---|---|---|
-| bisher: Deutsch mit Markdown (`v.txt`) | 7 044 | 100 % |
-| Depesche, Freitext Deutsch (`d.txt`) | 3 619 | etwa 60–65 % |
-| Depesche, Freitext Englisch (`e.txt`) | 3 286 | etwa 40–50 % |
+| Fassung | Zeichen | Tokens netto | gegenüber bisher |
+|---|---|---|---|
+| bisher: Deutsch mit Markdown (`v.txt`) | 7 044 | ~2 020 | 100 % |
+| Depesche, Freitext Deutsch (`d.txt`) | 3 619 | – | ~60–65 % (1. Messung) |
+| Depesche, Freitext Englisch (`e.txt`) | 3 286 | ~1 360 | ~67 % |
+| Depesche nach Stilregeln (`e2.txt`) | 3 245 | ~1 370 | ~67 % |
+| `SKILL.md` alt (Teamteil des Betreibers) | 3 681 | ~1 910 | 100 % |
+| `SKILL.md` neu (gleicher Teamteil, gekürzte Regeltexte) | 3 272 | ~1 350 | ~70 % |
 
-**So wurde gemessen:**
-- Die Leitsitzung hat jede Datei einmal eingelesen und vorher und nachher ihren Kontext abgefragt. Gezählt hat also der echte Tokenizer des Modells (Claude Opus 5.5).
-- Die Grundlast einer Abfrage ist mit einer leeren Datei abgezogen. Weil sie schwankt, stehen hier Spannen.
-- Rohwerte: `v` +4 995, `d` +3 506, `e` +2 741, leere Datei +1 244 bis +2 295.
+**Messmethode (2. Messung, 15.11.2026):**
+- Eine Sitzung liest jede Datei mit `cat` ein und fragt direkt danach ihren Kontext ab (`get_usage`). Zählt also der echte Tokenizer des Modells (Claude Opus 5.5).
+- Jeder Schritt ist eine eigene Nachricht, ohne Text dazwischen. Werden mehrere Aufrufe in einer Nachricht gebündelt, verfälscht das die Werte.
+- Abgezogen ist die Grundlast eines Schritts, gemessen mit der leeren Datei `0.txt`: +767 und +793 Tokens. Rohwerte: `v` +2 805, `e` +2 154, `e2` +2 159, `SKILL.md` alt +2 706, neu +2 140.
+- Die 1. Messung (Grundlast schwankte zwischen +1 244 und +2 295) ergab für `e` 40–50 %. Die 2. Messung hat eine stabile Grundlast und ist genauer.
 
 **Was die Zahlen bedeuten:**
-- Die Proben sind voller Nutzlast wie Pfade, Versionen und Befehle. Kurze Routinemeldungen wie „VM frei“ oder „fertig, CI grün“ schrumpfen viel stärker.
-- Englischer Freitext spart gegenüber deutschem noch einmal etwa ein Viertel, weil der Tokenizer Englisch günstiger zerlegt.
-- Weitere Einsparung bringen die Verhaltensregeln: kein Nachlesen ganzer Verläufe, keine Bestätigungen, keine wiederholten Regeln.
-- **Grenze:** Den Großteil der Tokens verbrauchen die Sitzungen bei der Arbeit selbst. Die Depesche spart nur bei den Nachrichten.
+- `e2` spart gegenüber `e` keine Tokens: `e` war schon knapp. Die Stilregeln machen Nachrichten einheitlich (eine Sache je Zeile, keine Artikel) und `check` findet Rückfälle in Prosa.
+- Die Proben sind voller Nutzlast (Pfade, Versionen, Befehle). Kurze Routinemeldungen wie „VM frei“ schrumpfen stärker.
+- `SKILL.md` lädt jede Sitzung, die eine Depesche schreibt oder liest, in ihren Kontext. Die 30 % weniger zählen also in jeder Sitzung des Teams.
+- **Grenze:** Den Großteil der Tokens verbrauchen die Sitzungen bei der Arbeit selbst. Die Depesche spart nur bei Nachrichten.
 
 ## Aufbau einer Nachricht
 
@@ -37,12 +41,23 @@ next after vm: push each branch once, open 2 PRs
 need vm window. #45 waits boss
 ```
 
-- **Zeile 1:** Kennung und Typ, bei einem Bericht der Status, dann Betreff oder Verweise. Ein `!` am Ende heißt dringend.
-- **Folgezeilen:** je ein Punkt, entweder als `feld wert` oder als `- punkt`.
-- **Freitext:** knappes Englisch ohne Füllwörter, Artikel und Höflichkeit.
+- **Zeile 1:** Kennung, Typ, bei `REP` der Status, dann Verweise oder Betreff. `!` am Ende heißt dringend.
+- **Folgezeilen:** je ein Punkt: `feld wert`, `TYP text` (Teilauftrag), `- punkt` oder Tabellenzeile. Andere Zeilenanfänge meldet `check`, weil der Übersetzer sie sonst als Feld lesen könnte (`by tomorrow` wäre „Frist: tomorrow“).
+- **Tabellen:** `T spalte,spalte`, dann je Zeile ein CSV-Datensatz. Die letzte Spalte nimmt den Rest der Zeile samt Kommas. Eine Leerzeile beendet die Tabelle.
 - **Verweise statt Inhalt:** `#n` Issue, `!n` PR, `@sha` Commit, `repo#n`, Dateipfad, Sitzungsname.
-- **Kürzel aus dem Teamteil:** feste Regeln (`R push,vm`) und lange Pfade (`$N/plan.md`).
-- **Nur ASCII:** Emoji, Unicode-Pfeile und Aufzählungszeichen kosten meist mehr Tokens als normale Wörter. Das hat auch das Esoteric AI Protocol gemessen.
+- **Kürzel aus dem Teamteil:** feste Regeln (`R push,vm`) und lange Pfade (`$N/plan.md`). In `Backticks` und "Anführungszeichen" bleibt alles wörtlich.
+- **Nur ASCII:** Emoji, Unicode-Pfeile und Aufzählungszeichen kosten meist mehr Tokens als Wörter (gemessen auch vom Esoteric AI Protocol).
+- **Klartext:** nach einer Zeile `!!` ganze Sätze bis zur nächsten Leerzeile. Darin beginnt keine neue Nachricht, auch wenn eine Zeile mit `DP1` anfängt.
+
+### Freitext im Telegrammstil
+
+Englisch, ohne Artikel, Füllwörter, Höflichkeit, Absicherungen und Wiederholung von Bekanntem. Satzbruchstücke und Imperativ sind erwünscht. Erlaubte Abkürzungen: `cfg dir env dep impl req resp msg fn arg repo ver doc auth perm tmp`.
+
+| schlecht | gut |
+|---|---|
+| I have pushed the fix and the CI is green now. | `did fix pushed, ci green` |
+| Could you please check whether the updater verifies the hash? | `- check updater verifies hash?` |
+| It would probably be best to wait for the build first. | `next wait build` |
 
 | Typ | Bedeutung | | Feld | Bedeutung |
 |---|---|---|---|---|
@@ -55,7 +70,7 @@ need vm window. #45 waits boss
 | `STOP` | sofort anhalten, sichern, warten | | `R` | Regeln |
 | `FYI` | zur Kenntnis, keine Antwort | | `T` | Tabelle: Kopf einmal, dann CSV-Zeilen |
 
-`./depesche.py expand messung/e.txt` übersetzt die Nachricht oben so:
+`./depesche.py expand messung/e.txt` übersetzt den Bericht oben so:
 
 ```
 [DP1] Bericht – teilweise erledigt: #46 #48
@@ -65,20 +80,20 @@ Als Nächstes: after vm: push each branch once, open 2 PRs
 Braucht: vm window. #45 waits boss
 ```
 
-Regelkürzel schreibt der Übersetzer aus. `R vm` wird zum Beispiel zu „Regel vm (Nur eine VM zur Zeit, das Fenster vergibt der Teamleiter)“. Pfadkürzel werden zum vollen Pfad.
+Regelkürzel schreibt der Übersetzer aus, `R vm` etwa zu „Regel vm (Nur eine VM zur Zeit, das Fenster vergibt der Teamleiter)“. Pfadkürzel werden zum vollen Pfad.
 
 ## Regeln für die Sitzungen
 
 1. **Eine Nachricht je Anlass,** Punkte bündeln. Keine Bestätigung: Schweigen heißt angenommen.
-2. **Bericht bei Abschluss oder wenn es hakt:** `REP` mit Status, dann `did`, `now`, `next` und `need`, höchstens sechs Zeilen. Das Wichtigste gehört in die ersten 400 Zeichen, denn oft sieht der Teamleiter nur die.
-3. **Fragen nur, wenn es ohne Antwort nicht weitergeht.** Alles andere kommt in den nächsten Bericht.
-4. **Klartext:** Nach einer Zeile `!!` folgen ganze, klare Sätze. Das gilt für Sicherheitsfunde, Unumkehrbares, Entscheidungen für den Menschen und Freigaben.
+2. **Bericht bei Abschluss oder Blockade:** `REP` mit Status, dann `did`, `now`, `next`, `need`, höchstens sechs Zeilen. Das Wichtigste in die ersten 400 Zeichen: oft sieht der Teamleiter nur die.
+3. **Fragen nur, wenn es ohne Antwort nicht weitergeht.** Alles andere in den nächsten Bericht.
+4. **Klartext** (`!!`) für Sicherheitsfunde, Unumkehrbares, Entscheidungen des Menschen und Freigaben.
 5. **Wörtlich** bleiben Code, Befehle, Pfade, Fehlermeldungen und IDs.
-6. **Nie in Depesche:** alles, was der Mensch direkt liest, also Chat, Abschlussbox, Issues, PRs und Commits.
+6. **Nie in Depesche:** alles, was der Mensch direkt liest: Chat, Abschlussbox, Issues, PRs, Commits.
 
 ## Einrichten
 
-1. Leg den Teamteil an: `beispiel/glossar-team.tsv` nach `~/.config/depesche/glossar-team.tsv` kopieren und eigene Regeln, Pfade und Wörter eintragen. Der eigene Teamteil gehört nicht in ein öffentliches Repo.
+1. Teamteil anlegen: `beispiel/glossar-team.tsv` nach `~/.config/depesche/glossar-team.tsv` kopieren, eigene Regeln, Pfade und Wörter eintragen. Der eigene Teamteil gehört nicht in ein öffentliches Repo.
 2. `./depesche.py skill` erzeugt `~/.claude/skills/depesche/SKILL.md`. Danach kennt jede neue Claude-Code-Sitzung die Depesche.
 3. Der Leitsitzung sagen, dass sie mit ihren Sitzungen in Depesche spricht.
 
@@ -91,21 +106,33 @@ Regelkürzel schreibt der Übersetzer aus. `R vm` wird zum Beispiel zu „Regel 
 | `spec.md` | Vorlage der Regeln für die Sitzungen, englisch und knapp |
 | `depesche.py` | Übersetzer, Prüfer, Zähler und Skill-Erzeuger, nur Python-Standardbibliothek |
 | `tests/` | Tests, laufen in der CI |
-| `messung/` | die fünf Proben in drei Fassungen und eine leere Datei |
+| `messung/` | die fünf Proben in vier Fassungen und eine leere Datei; Zeilen mit `===` trennen die Proben |
 
-Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kommen nur dort hinein, danach wird die Skill-Datei neu erzeugt. So bleibt es bei einer Quelle.
+Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kommen nur dort hinein, danach wird die Skill-Datei neu erzeugt. Codes, deren englische Bedeutung der Code selbst ist (`next`, `ci`, `risk`), stehen in `SKILL.md` ohne Erklärung.
+
+**Neue Kürzel** nur, wenn eine Wendung in den Proben mindestens dreimal vorkommt und das Kürzel Tokens spart. Bei der Prüfung am 15.11.2026 erfüllte keine Wendung das. Bestehende Codes bleiben; umbenennen nur mit Alias für den alten Code.
 
 ## Werkzeug
 
 ```
 ./depesche.py expand [--en] [DATEI]   # in Klartext übersetzen, Vorgabe Deutsch
-./depesche.py check [DATEI ...]       # Kopfzeile, Codes und teure Zeichen prüfen
+./depesche.py check [DATEI ...]       # Aufbau, Codes, Zeichen und Stil prüfen
 ./depesche.py stats DATEI ...         # Zeichen, Wörter und Zeilen vergleichen
 ./depesche.py skill [ZIEL|-]          # SKILL.md erzeugen
 ./depesche.py --team PFAD ...         # anderen Teamteil verwenden
 ```
 
-Ohne Datei liest das Werkzeug von der Standardeingabe. `check` gibt bei Fehlern den Rückgabewert 1 zurück: bei unbekannten Typen, Regeln oder Pfaden und bei einem Bericht ohne Status.
+Ohne Datei liest das Werkzeug von der Standardeingabe.
+
+`check` meldet **Fehler** (Rückgabewert 1): unbekannter Typ, unbekannte Regel oder unbekannter Pfad, Bericht ohne Status, keine Kopfzeile.
+
+Dazu **Hinweise** (Rückgabewert bleibt 0):
+- Bericht mit mehr als sechs Zeilen;
+- teure Nicht-ASCII-Zeichen;
+- Zeile länger als 160 Zeichen: in `- `-Punkte teilen;
+- Zeile, die weder mit Feld, Typ noch `- ` beginnt;
+- Tabellenzeile mit zu wenigen Spalten;
+- Stil: Artikel und Füllwörter (`the`, `please`, `just` …, deutsch `der`, `bitte`, `mal` …). Die Sprache bestimmt `check` je Nachricht über häufige Funktionswörter. Ausgenommen sind Code, Zitate, Pfade, Verweise und `!!`-Blöcke. Großes `A` gilt als Bezeichnung (`part A`), nicht als Artikel.
 
 ## Vorbilder
 

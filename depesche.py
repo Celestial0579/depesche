@@ -3,7 +3,7 @@
 
 Aufrufe:
   depesche.py expand [--en] [DATEI]   Nachrichten in Klartext übersetzen (Vorgabe Deutsch)
-  depesche.py check [DATEI ...]       Kopfzeile, Codes und Zeichen prüfen, Rückgabe 1 bei Fehlern
+  depesche.py check [DATEI ...]       Aufbau, Codes, Zeichen und Stil prüfen, Rückgabe 1 nur bei Fehlern
   depesche.py stats DATEI ...         Zeichen, Wörter und Zeilen zählen
   depesche.py skill [ZIEL|-]          SKILL.md erzeugen, Vorgabe ~/.claude/skills/depesche/SKILL.md
 Ohne DATEI liest das Werkzeug von der Standardeingabe. Es braucht nur die Python-Standardbibliothek.
@@ -36,6 +36,22 @@ REGEL_IM_TEXT = re.compile(r"(?<![\w$])R ([a-z]+(?:,[a-z]+)*)\b")
 PFAD = re.compile(r"\$[A-Z]\b")
 WORTE = {"de": ("dringend", "Klartext (kritisch, genau lesen):", "Regel"),
          "en": ("urgent", "Plain text (critical, read exactly):", "rule")}
+WOERTLICH = re.compile(r"`[^`]*`|\"[^\"]*\"")  # Code und Zitate: nichts ausschreiben, nichts bemängeln
+TRENNER = "==="  # Zeilen mit === am Anfang trennen Proben in einer Datei (messung/)
+MAX_ZEILE = 160  # längere Freitextzeilen meldet check: lieber in "- "-Punkte teilen
+# Telegrammstil: Artikel und Füllwörter je Sprache. Die Sprache bestimmt check je Nachricht über MARKER.
+STIL = {  # Sprache: (Artikel, Füllwörter, Füllphrasen)
+    "en": ("a an the".split(),
+           "please kindly just really very basically actually simply quite maybe perhaps probably somewhat "
+           "thanks thank sorry hello hi".split(),
+           ["i think", "i believe", "it seems", "in order to", "as mentioned", "note that", "of course"]),
+    "de": ("der die das den dem des ein eine einen einem einer eines".split(),
+           "bitte eigentlich einfach eben mal wohl vielleicht doch gerne danke schon ziemlich quasi sozusagen "
+           "eventuell".split(),
+           ["ich denke", "ich glaube", "im grunde", "an sich"]),
+}
+MARKER = {"en": set("and not is are with for to of on after or if then also only was be".split()),
+          "de": set("und nicht ist sind mit für zu auf nach oder wenn dann auch nur noch bei vor kein keine".split())}
 
 
 def lade_glossar(team=None):
@@ -59,10 +75,19 @@ def lade_glossar(team=None):
 
 def bloecke(text):
     """Teilt den Text in Blöcke [kopfzeile, zeilen]. Zeilen vor der ersten Kopfzeile haben kopfzeile None."""
-    erg = []
+    erg, klartext = [], False
     for zeile in text.splitlines():
-        if zeile == KENNUNG or zeile.startswith(KENNUNG + " "):
+        s = zeile.strip()
+        if klartext:  # im !!-Block beginnt keine neue Nachricht, er endet an einer Leerzeile
+            klartext = bool(s)
+            erg[-1][1].append(zeile)
+        elif zeile == KENNUNG or zeile.startswith(KENNUNG + " "):
             erg.append([zeile, []])
+        elif zeile.startswith(TRENNER):  # Trennzeile zwischen Proben, gehört zu keiner Nachricht
+            erg.append([None, [zeile]])
+        elif s == "!!" and erg and erg[-1][0] is not None:
+            klartext = True
+            erg[-1][1].append(zeile)
         elif not erg or erg[-1][0] is None:
             if not erg:
                 erg.append([None, []])
@@ -85,6 +110,24 @@ def kopf(zeile, g):
     return typ, status, " ".join(rest), dringend
 
 
+def ausserhalb_woertlich(s, fn):
+    """Wendet fn nur auf die Teile von s an, die nicht in `Backticks` oder "Anführungszeichen" stehen."""
+    aus, pos = [], 0
+    for m in WOERTLICH.finditer(s):
+        aus += [fn(s[pos:m.start()]), m.group(0)]
+        pos = m.end()
+    return "".join(aus + [fn(s[pos:])])
+
+
+def ohne_woertlich(s):
+    return WOERTLICH.sub(" ", s)
+
+
+def tabellenzeile(spalten, s):
+    """Die letzte Spalte nimmt den Rest der Zeile, Kommas darin bleiben erhalten."""
+    return [w.strip() for w in s.split(",", len(spalten) - 1)]
+
+
 class Uebersetzer:
     def __init__(self, g, sp):
         self.g, self.sp = g, sp
@@ -97,15 +140,17 @@ class Uebersetzer:
         return "; ".join(teile)
 
     def text(self, s):
-        s = PFAD.sub(lambda m: self.g["pfad"].get(m.group(0), {}).get("de", m.group(0)), s)
-
         def regel(m):
             codes = m.group(1).split(",")
             if all(c in self.g["regel"] for c in codes):
                 return f"{WORTE[self.sp][2]} {self.regeln(codes)}"
             return m.group(0)
 
-        return REGEL_IM_TEXT.sub(regel, s)
+        def frei(t):
+            t = PFAD.sub(lambda m: self.g["pfad"].get(m.group(0), {}).get("de", m.group(0)), t)
+            return REGEL_IM_TEXT.sub(regel, t)
+
+        return ausserhalb_woertlich(s, frei)
 
     def kopfzeile(self, zeile):
         typ, status, betreff, dringend = kopf(zeile, self.g)
@@ -144,7 +189,7 @@ class Uebersetzer:
                 spalten = [c.strip() for c in rest.split(",")]
                 aus.append(f"{self.g['feld']['T'][self.sp]} ({', '.join(spalten)}):")
             elif spalten and "," in s and wort not in self.g["feld"] and wort not in self.g["typ"]:
-                werte = [w.strip() for w in s.split(",")]
+                werte = tabellenzeile(spalten, s)
                 aus.append("  " + ", ".join(f"{k}={v}" for k, v in zip(spalten, werte)))
             elif wort in self.g["feld"]:
                 spalten = None
@@ -160,7 +205,11 @@ class Uebersetzer:
 def lies(dateien):
     if not dateien:
         return [("-", sys.stdin.read())]
-    return [(d, open(d, encoding="utf-8").read()) for d in dateien]
+    erg = []
+    for d in dateien:
+        with open(d, encoding="utf-8") as f:
+            erg.append((d, f.read()))
+    return erg
 
 
 def expand(args, g):
@@ -173,6 +222,23 @@ def expand(args, g):
             print(u.kopfzeile(kopfz))
             for z in u.block(zeilen):
                 print(z)
+
+
+def sprache(zeilen):
+    """Schätzt die Sprache des Freitexts über häufige Funktionswörter: "de" oder "en"."""
+    woerter = re.findall(r"[a-zäöüß]+", " ".join(ohne_woertlich(z) for z in zeilen).lower())
+    return "de" if sum(w in MARKER["de"] for w in woerter) > sum(w in MARKER["en"] for w in woerter) else "en"
+
+
+def stil(s, sp):
+    """Artikel und Füllwörter in einer Freitextzeile, ohne Code, Zitate, Pfade und Verweise."""
+    frei = " ".join(w for w in ohne_woertlich(s).split() if not re.search(r"[/\\#@$]", w))
+    artikel, fuell, phrasen = STIL[sp]
+    woerter = re.findall(r"[A-Za-zÄÖÜäöüß]+", frei)
+    # großes "A" ist meist eine Bezeichnung (part A, Antwort A), kein Artikel
+    funde = [w.lower() for w in woerter if (w.lower() in artikel and w != "A") or w.lower() in fuell]
+    funde += [ph for ph in phrasen if re.search(rf"\b{ph}\b", frei.lower())]
+    return sorted(set(funde), key=funde.index)
 
 
 def pruefe(text, g):
@@ -189,19 +255,47 @@ def pruefe(text, g):
         if typ == "REP" and len([z for z in zeilen if z.strip()]) > 6:
             hinweise.append(f"REP mit mehr als 6 Zeilen: {kopfz}")
         alles = "\n".join([kopfz] + zeilen)
-        for p in sorted(set(PFAD.findall(alles)) - set(g["pfad"])):
+        for p in sorted(set(PFAD.findall(ohne_woertlich(alles))) - set(g["pfad"])):
             fehler.append(f"unbekannter Pfad {p}: {kopfz}")
-        for z in [kopfz] + zeilen:
+        sp = sprache([kopfz] + zeilen)
+        klartext, spalten = False, None
+        for nr, z in enumerate([kopfz] + zeilen):
             s = z.strip()
+            if klartext:  # ganze Sätze sind hier gewollt, Codes werden nicht ausgeschrieben
+                klartext = bool(s)
+                continue
+            if not s:
+                spalten = None
+                continue
+            frei = ohne_woertlich(s)
+            wort = s.split()[0]
             codes = []
-            if s.startswith("R "):
-                codes = [c for c in re.split(r"[ ,]+", s[2:]) if c]
+            if wort == "R":
+                codes = [c for c in re.split(r"[ ,]+", frei[2:]) if c]
             else:
-                for m in REGEL_IM_TEXT.finditer(s):
+                for m in REGEL_IM_TEXT.finditer(frei):
                     codes += m.group(1).split(",")
             for c in codes:
                 if c not in g["regel"]:
                     fehler.append(f"unbekannte Regel {c!r}: {s}")
+            if s == "!!":
+                klartext = True
+                continue
+            if nr and wort == "T":
+                spalten = [c.strip() for c in s[2:].split(",")]
+                continue
+            if nr and spalten and wort not in g["feld"] and wort not in g["typ"]:
+                if s.count(",") < len(spalten) - 1:
+                    hinweise.append(f"Tabellenzeile mit weniger als {len(spalten)} Spalten: {s}")
+                continue
+            spalten = None
+            if nr and wort not in g["feld"] and wort not in g["typ"] and not s.startswith("- "):
+                hinweise.append(f"Zeile beginnt weder mit Feld, Typ noch '- ': {s}")
+            if len(s) > MAX_ZEILE:
+                hinweise.append(f"Zeile länger als {MAX_ZEILE} Zeichen ({len(s)}), in '- '-Punkte teilen: {s[:60]}...")
+            funde = stil(s, sp)
+            if funde:
+                hinweise.append(f"Stil ({sp}): {', '.join(funde)} streichen: {s}")
         teuer = sorted({ch for ch in alles if ord(ch) > 127 and not unicodedata.category(ch).startswith("L")})
         for ch in teuer:
             hinweise.append(f"Zeichen {ch!r} (U+{ord(ch):04X}) kostet meist mehr Tokens als ASCII: {kopfz}")
@@ -226,28 +320,30 @@ def stats(args, g):
     basis = None
     for name, text in lies(args.datei):
         z = len(text)
-        basis = basis or z
-        print(f"{name}: {z} Zeichen, {len(text.split())} Wörter, {text.count(chr(10))} Zeilen, {z / basis:.0%} der ersten Datei")
+        basis = z if basis is None else basis
+        anteil = f", {z / basis:.0%} der ersten Datei" if basis else ""
+        print(f"{name}: {z} Zeichen, {len(text.split())} Wörter, {text.count(chr(10))} Zeilen{anteil}")
 
 
 def skill(args, g):
-    def reihe(art):
-        return " | ".join(f"{c}={v['en']}" for c, v in g.get(art, {}).items())
+    def reihe(art, sp="en"):
+        # Codes, die ihre eigene Bedeutung sind (next=next, ci=CI), stehen ohne Erklärung da
+        return "; ".join(c if v[sp].lower() == c.lower() else f"{c}={v[sp]}" for c, v in g.get(art, {}).items())
 
     glossar = "\n".join([
         "- TYPE: " + reihe("typ"),
         "- status: " + reihe("status"),
         "- fields: " + reihe("feld"),
         "- rules: " + reihe("regel"),
-        "- paths: " + " | ".join(f"{c}={v['de']}" for c, v in g["pfad"].items()),
+        "- paths: " + reihe("pfad", "de"),
         "- words: " + reihe("wort"),
     ])
     with open(os.path.join(HIER, "spec.md"), encoding="utf-8") as f:
         text = f.read()
     text = text.replace("{{NAME}}", NAME).replace("{{KENNUNG}}", KENNUNG).replace("{{GLOSSAR}}", glossar)
-    kopfteil = (f"---\nname: {NAME.lower()}\ndescription: {NAME} ({KENNUNG}) compact message protocol between team-lead "
-                f"and staff Claude sessions. Use for every SendMessage between team lead and staff sessions and to read "
-                f"messages starting with {KENNUNG}.\n---\n\n")
+    kopfteil = (f"---\nname: {NAME.lower()}\ndescription: {NAME} ({KENNUNG}) compact message protocol, team-lead <-> "
+                f"staff Claude sessions. Use for every SendMessage between them and to read messages starting {KENNUNG}."
+                f"\n---\n\n")
     if args.ziel == "-":
         sys.stdout.write(kopfteil + text)
         return
