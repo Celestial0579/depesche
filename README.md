@@ -97,6 +97,19 @@ Regelkürzel schreibt der Übersetzer aus, `R vm` etwa zu „Regel vm (Nur eine 
 2. `./depesche.py skill` erzeugt `~/.claude/skills/depesche/SKILL.md`. Danach kennt jede neue Claude-Code-Sitzung die Depesche.
 3. Der Leitsitzung sagen, dass sie mit ihren Sitzungen in Depesche spricht.
 
+### Als Skill in Claude Desktop oder claude.ai importieren
+
+1. `./depesche.py skill --zip` baut `skill/depesche.zip` aus Kern und eigenem Teamteil. Der Ordner `skill/` steht in `.gitignore`: Die Zip enthält den privaten Teamteil und gehört in kein Repo.
+2. In Claude (Desktop oder claude.ai): Seitenleiste **Customize** → **Skills** → **+** → **Upload a skill**, dann die Zip wählen.
+3. Den Skill in der Liste einschalten. Skills brauchen die Code-Ausführung: bei Einzelplänen unter **Settings → Capabilities**.
+
+Das Werkzeug prüft beim Bauen die Upload-Regeln aus der Hilfe von Anthropic (Stand 15.11.2026):
+- Die Zip enthält den Ordner `depesche/` als Wurzel, darin `SKILL.md`. Der Ordnername gleicht dem `name` im Frontmatter.
+- `name`: höchstens 64 Zeichen aus Kleinbuchstaben, Ziffern und `-`, ohne „anthropic“ und „claude“.
+- `description`: nicht leer, höchstens 200 Zeichen (claude.ai; die API erlaubt 1024), ohne XML-Tags. Das Werkzeug lehnt spitze Klammern ganz ab.
+
+Quellen: [How to create custom skills](https://support.claude.com/en/articles/12512198-how-to-create-custom-skills), [Use skills in Claude](https://support.claude.com/en/articles/12512180-use-skills-in-claude), [Agent Skills](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview).
+
 ## Dateien
 
 | Datei | Inhalt |
@@ -119,6 +132,7 @@ Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kom
 ./depesche.py check [DATEI ...]       # Aufbau, Codes, Zeichen und Stil prüfen
 ./depesche.py stats DATEI ...         # Zeichen, Wörter und Zeilen vergleichen
 ./depesche.py skill [ZIEL|-]          # SKILL.md erzeugen
+./depesche.py skill --zip [ZIEL]      # Zip für den Import in Claude, Vorgabe skill/depesche.zip
 ./depesche.py --team PFAD ...         # anderen Teamteil verwenden
 ```
 
