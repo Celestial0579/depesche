@@ -1,0 +1,36 @@
+# Allgemeiner Teil: für jedes Team gleich. Spalten: Code<TAB>Art<TAB>Deutsch<TAB>Englisch
+DO	typ	Auftrag	order
+ASK	typ	Frage (Antwort nötig)	question (answer needed)
+ANS	typ	Antwort	answer
+REP	typ	Bericht	report
+GO	typ	Freigabe	go-ahead
+NO	typ	Ablehnung	refusal
+STOP	typ	Sofort anhalten, Stand sichern, warten	stop now, save state, wait
+FYI	typ	Zur Kenntnis (keine Antwort)	info (no reply)
+ok	status	erledigt	done
+part	status	teilweise erledigt	partly done
+fail	status	gescheitert	failed
+blk	status	blockiert	blocked
+did	feld	Erledigt	done
+now	feld	Stand	state
+next	feld	Als Nächstes	next
+need	feld	Braucht	needs
+ci	feld	CI	CI
+why	feld	Grund	reason
+risk	feld	Risiko	risk
+src	feld	Entschieden von	decided by
+by	feld	Frist	deadline
+out	feld	Ergebnis in	output in
+R	feld	Regeln	rules
+T	feld	Tabelle	table
+->	zeichen	dann, führt zu	then, leads to
++	zeichen	und	and
+=	zeichen	ist, gesetzt auf	is, set to
+~	zeichen	etwa	about
+?	zeichen	unklar	unknown
+!	zeichen	dringend (am Ende der Kopfzeile)	urgent (end of header)
+!!	zeichen	Klartext folgt: kritisch, genau lesen	plain text follows: critical, read exactly
+#n	verweis	Issue n im eigenen Repo	issue n in own repo
+!n	verweis	PR n im eigenen Repo	PR n in own repo
+@sha	verweis	Commit	commit
+repo#n	verweis	Issue n in einem anderen Repo	issue n in other repo

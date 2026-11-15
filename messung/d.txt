@@ -1,0 +1,39 @@
+=== S1
+DP1 GO vm #46 #48
+now 22:24 keine VM, 12,6G frei. R vm
+next VM aus -> widgettea-110 "DP1 GO vm" senden; REP 1 Zeile
+DO audit
+- Actions per SHA + Versionskommentar: ci.yml checkout@v7 setup-dotnet@v6, release.yml dito + upload-artifact@v7. dependabot.yml muss github-actions abdecken. eigener PR oder mit #46/#48. R push
+- v0.2.4 ohne Prüfsummen-Datei -> nächstes rel: SHA256SUMS als Asset, möglichst attest-build-provenance
+- $N/windows-pruefliste.md: prüfen, nur Lücken, Teil A zuerst (prüft Updater SHA-256?), Lücke -> Issue. passt es, in den VM-Lauf, Rest nächstes rel
+FYI #45 #35 #36 -> frage Chef
+=== S2
+DP1 DO dependabot#16
+FYI DSU jetzt an
+- #16 niedrig: npm/deepmerge in tools/web-ext/package-lock.json, Prototype Poisoning in mergeObject(), keine gepatchte Version
+- neueres web-ext oder overrides versuchen
+- geht nicht + nicht ausnutzbar (nur Bauwerkzeug, keine fremden Eingaben): als tolerable risk mit Begründung schließen + Nachprüfungs-Issue
+- AMO-Zip 1.1.0 bleibt, Chef lädt genau diese Datei hoch
+- Dependabot-PRs: prüfen, nur bei grüner CI mergen
+DO $N/windows-pruefliste.md: prüfen, nur Lücken -> #47 oder eigenes Issue, Umsetzung nach 1.1.0, Teil A zuerst (lokale API, Updater)
+=== S3
+DP1 DO handover
+src boss: P2V-Stick (Hardware -> Proxmox-VM, ~/Management/p2v-stick) = vierter Weg im Rettungsassistenten, Projektname Projekt B
+why neue Sitzung macht Umbenennung + Einbau; dein Kontext 66% -> jeder Schritt teuer
+- Beta .6 durchlaufen lassen (Bau 21:12Z lief um 22:23 noch), dann ci-gruen-pruefen.sh
+- 1 PR: Node-24-Actions per SHA (wie aufgelöst) + .github/dependabot.yml (github-actions) + SECURITY.md (-> private Meldung, seit heute an, keine Zusagen zu Antwortzeit/CVE). R push. PR-Bau abwarten, bei Grün mergen, keine neue Beta
+- $N/uebergabe-projekt-b.md schreiben, dicht: Aufbau (rescue/lib, rescue/bin, Build, packages.list, CI-Selbsttest); Sicherheitsregeln (safety.sh, Ziel-Bestätigung), an die ein neuer Weg sich hält; wo der Assistent die 3 Wege anbietet; Release- + Beta-Ablauf (Nummern, Attestierung, Prüfbefehl); offen #54 #34 + Fallen; jede harte Stelle "firestrike" (ISO-Name, Banner, GRUB, Doku, Prüfbefehl, frs-Präfix, sudoers). keine Geheimnisse
+- nichts umbenennen, nichts an P2V. R name
+next REP wenn 1-3 fertig -> tl startet Projekt-B-Sitzung + archiviert dich
+=== S4
+DP1 FYI src boss 22:30, erst nach VM-Lauf
+- #45: Antwort A, Variable GH_DEPENDENCY_SUBMISSION_SKIP_CACHE=true von tl gesetzt, kein anderes Repo betroffen. nächster Push auf main: Dependency Submission ohne Warnung prüfen -> #45 mit Lauf-Link schließen
+- #35 #36: beide bauen, Start >=1118 nach Kontingent-Reset, #36 zuerst. Entscheidung in beiden Issues festhalten (1 Satz, R priv). vorher nicht anfangen
+- main: Ruleset protect-default-branch (kein Löschen/Force-Push), normaler Push + Merge ok
+=== S5
+DP1 REP part #46 #48
+did lokale Commits, nicht gepusht: #46 @de98b11 Ordnerrechte außerhalb des Profils (Warnung + nur Benutzer/SYSTEM/Admins; Test-Installer Schritt 5: Ordner im Laufwerksstamm). #48 @52bef30 (auf #46): Schlüssel -> Software\Celestial0579\Lagerfeuer, beim Update InstallDir aus altem Schlüssel übernehmen, dann löschen, Deinstallation löscht beide + leeren Elternschlüssel, App unverändert, Schritt 6 prüft Umzug
+ci lokal: Build 0 Warnungen, 559 Tests grün, pwsh-Parse ok. Setup braucht VM (kein NSIS auf Host)
+now bereit: skripte/lauf-46-48.sh (baut 0.2.5, Test-Installer -SkipOld als Benutzer), update-024.ps1 (0.2.4 -> Vorgabe-/Profil-/Laufwerksstamm-Ordner, Prüfsumme Setup 0.2.4 ok)
+next nach VM: jeden Zweig einmal pushen, 2 PRs öffnen
+need VM-Fenster. #45 wartet auf Chef

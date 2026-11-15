@@ -1,0 +1,17 @@
+# Beispiel für einen Teamteil. Eigene Fassung nach ~/.config/depesche/glossar-team.tsv kopieren und anpassen
+# oder den Pfad mit DEPESCHE_TEAM bzw. --team angeben. Der eigene Teamteil gehört nicht in ein öffentliches Repo.
+# Spalten: Code<TAB>Art<TAB>Deutsch<TAB>Englisch (leer = wie Deutsch)
+push	regel	Vor dem Push lokal bauen und testen, nur fertige Stände, ein Push, kein roter CI-Lauf	build and test locally before push, push finished state once, no red CI run
+green	regel	Fertig heißt: alle CI-Läufe durch und grün, keine ignorierten Warnungen	done = all CI runs finished and green, no ignored warnings
+sec	regel	Geheimnisse nie ausgeben und nie in Dateien, Logs oder Nachrichten schreiben	never print secrets or put them in files, logs, messages
+priv	regel	Keine privaten Details (Namen, IPs, Standorte, Infrastruktur) in öffentlichen Repos	no private details (names, IPs, locations, infra) in public repos
+issue	regel	Jeder Fund wird ein Issue	every finding becomes an issue
+del	regel	Löschen und echte Entscheidungen nur mit Freigabe des Chefs	deletions and real decisions need boss approval
+name	regel	Umbenennen erst nach Freigabe des Chefs	rename only after boss approval
+stop	regel	Sagt der Chef Stopp: sofort sichern und warten	boss says stop: save and wait
+vm	regel	Nur eine VM zur Zeit, das Fenster vergibt der Teamleiter	one VM at a time, TL assigns the window
+$N	pfad	~/notizen/teamleiter
+tl	wort	Teamleiter (Leitsitzung)	team lead session
+boss	wort	Chef (Betreiber)	boss (operator)
+rel	wort	Release	release
+ctx	wort	Kontext	context

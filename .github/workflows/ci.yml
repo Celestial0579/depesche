@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DEPESCHE_TEAM: beispiel/glossar-team.tsv
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Proben prüfen
+        run: python3 depesche.py check messung/d.txt messung/e.txt
+      - name: Skill erzeugen
+        run: python3 depesche.py skill - > /dev/null

@@ -1,0 +1,102 @@
+=== S1
+Das VM-Fenster gehört jetzt dir für den Lauf zu #46/#48. WidgetTea wartet als Nächste.
+
+**VM**
+- Um 22:24 lief keine VM, verfügbar waren 12,6 GB. Prüf vor dem Start trotzdem `free -m`.
+- Nach dem Lauf: VM aus, dann WidgetTea direkt Bescheid geben, mit `SendMessage` an `local_00000000-0000-0000-0000-000000000000`, Text „VM frei“.
+- Mir danach in einem Satz melden, wie der Lauf ausging.
+
+**Aus meiner Best-Practice-Prüfung aller Repos, für dein Repo:**
+1. **Actions per Commit-SHA festlegen**, die Version als Kommentar.
+   - `ci.yml`: `checkout@v7`, `setup-dotnet@v6`
+   - `release.yml`: `checkout@v7`, `setup-dotnet@v6`, `upload-artifact@v7`
+   - Prüf auch, dass `.github/dependabot.yml` `github-actions` abdeckt.
+   - Ob das ein eigener kleiner PR wird oder mit #46/#48 geht, entscheidest du. Hauptsache: lokal geprüft, ein Push, kein roter Lauf.
+2. **Release-Prüfsummen:** v0.2.4 hat keine Prüfsummen-Datei. Ab dem nächsten Release gehört `SHA256SUMS` als Asset dazu, möglichst mit Build-Provenienz (`actions/attest-build-provenance`).
+3. **Windows-Prüfliste:** `~/notizen/teamleiter/windows-pruefliste.md`
+   - Erst prüfen, nur Lücken melden.
+   - Teil A (Sicherheit) zuerst, vor allem den Updater: Prüft er die SHA-256 vor dem Start?
+   - Lücken werden Issues.
+   - Was in den laufenden VM-Lauf passt, nimm mit. Der Rest geht mit dem nächsten Release.
+
+**#45 und #35/#36:** Die frage ich Chef gleich direkt.
+=== S2
+Ich habe in AppX die Dependabot-Sicherheitsupdates eingeschaltet. Dabei ist eine offene Warnung aufgetaucht, die du bitte bewertest.
+
+**Die Warnung:**
+- Dependabot #16, Schwere niedrig
+- Paket: npm/deepmerge in `tools/web-ext/package-lock.json`
+- Prototype Poisoning in `mergeObject()`
+- Eine gepatchte Version gibt es nicht.
+
+**Was du tun sollst:**
+1. Prüf, ob ein neueres web-ext oder ein `overrides`-Eintrag die Warnung loswird.
+2. Geht das nicht und ist die Lücke nicht ausnutzbar (nur Bauwerkzeug, keine fremden Eingaben), dann:
+   - schließ die Warnung mit Begründung als „tolerable risk“;
+   - leg ein Nachprüfungs-Issue an, das den Fall wieder aufnimmt, sobald es einen Fix gibt.
+
+**Was unverändert bleibt:** das gebaute AMO-Zip 1.1.0. Chef lädt genau diese Datei hoch.
+
+**Ab jetzt:** Dependabot kann jetzt selbst PRs öffnen. Die behandelst du wie üblich: erst prüfen, und gemergt wird nur bei grüner CI.
+
+**Windows-Prüfliste:** `~/notizen/teamleiter/windows-pruefliste.md`
+- Erst prüfen, nur Lücken melden.
+- Lücken kommen nach #47 oder in ein eigenes Issue.
+- Umgesetzt wird nach 1.1.0, wie geplant.
+- Schau dir Teil A zuerst an, vor allem die lokale API und den Updater.
+=== S3
+Chef hat entschieden: Der P2V-Stick wird der vierte Weg im Rettungsassistenten, und das Projekt heißt künftig „Projekt B“.
+
+Der P2V-Stick ist der Assistent für den Umzug von echter Hardware in eine Proxmox-VM. Sein Stand liegt unter `~/Management/p2v-stick`.
+
+Umbenennung und Einbau übernimmt eine neue Sitzung. Dein Kontext steht schon bei 66 %, da wird jeder weitere Schritt teuer.
+
+Dein Rest:
+1. **Die Beta .6 durchlaufen lassen.** Der Build-Lauf von 21:12 UTC war um 22:23 noch nicht fertig. Danach mit `ci-gruen-pruefen.sh` prüfen.
+2. **Ein PR** mit drei Teilen:
+   - die Node-24-Actions per SHA, so wie du sie aufgelöst hast;
+   - `.github/dependabot.yml` für `github-actions`;
+   - `SECURITY.md` mit Verweis auf die private Meldung von Schwachstellen. Die ist seit heute eingeschaltet. Keine Zusagen zu Antwortzeiten oder CVEs.
+
+   Vorher lokal prüfen, dann ein Push. Den Bau-Lauf am PR abwarten und erst bei Grün mergen. Eine neue Beta braucht es dafür nicht.
+3. **Übergabe für die Projekt-B-Sitzung** als Datei `~/notizen/teamleiter/uebergabe-projekt-b.md`. Kurz und dicht, mit diesen Punkten:
+   - Aufbau: `rescue/lib`, `rescue/bin`, Build, Paketliste, Selbsttest in der CI;
+   - die Sicherheitsregeln aus `safety.sh` und der Ziel-Bestätigung, also woran sich ein neuer Weg halten muss;
+   - wo der Assistent die drei Wege anbietet;
+   - Release- und Beta-Ablauf mit Nummernschema, Attestierung und Prüfbefehl;
+   - offene Issues (#54, #34) und Fallen, auf die du gestoßen bist;
+   - jede Stelle, an der der Name „firestrike“ hart drinsteht: ISO-Name, Banner, GRUB, Doku, Prüfbefehl, `frs-`-Präfix, sudoers-Regeln.
+
+   Keine Geheimnisse in die Datei.
+4. **Nichts umbenennen** und nichts an P2V anfangen.
+
+Melde mir, wenn 1 bis 3 fertig sind. Danach starte ich die Projekt-B-Sitzung und archiviere dich.
+=== S4
+Chef hat um 22:30 über #45, #35 und #36 entschieden. Das Folgende ist erst nach deinem VM-Lauf dran.
+
+**#45, NuGet-Cache-Warnung:** Antwort A. Die Repo-Variable `GH_DEPENDENCY_SUBMISSION_SKIP_CACHE=true` habe ich gesetzt. Andere Repos zeigen diese Warnung nicht.
+- Prüf beim nächsten Push auf main, ob die automatische Dependency Submission ohne die Warnung durchläuft.
+- Wenn ja, schließ #45 mit einem Verweis auf diesen Lauf.
+
+**#35 Sammlungen und #36 Wiedergabelisten:** Beide werden gebaut, aber erst ab Mittwoch, 18.11., nach dem Reset des Wochenkontingents.
+- Die Wiedergabelisten (#36) kommen zuerst.
+- Halte die Entscheidung in beiden Issues fest, in einem Satz und ohne private Details.
+- Vor Mittwoch fängst du damit nicht an.
+
+**Neu auf main:** Seit eben gilt ein Ruleset `protect-default-branch`. Es sperrt Force-Push und Löschen. Normale Pushes und PR-Merges laufen wie bisher.
+=== S5
+Beide Fixes liegen als lokale Commits vor, gepusht ist noch nichts. Erst soll ein gemeinsamer VM-Lauf durch sein, dafür habe ich bei dir um ein Fenster gebeten.
+
+- **#46, Ordnerrechte (`de98b11`):** Wird außerhalb des Profils installiert, warnt das Setup und gibt nur dem Benutzer, SYSTEM und den Administratoren Zugriff. Schritt 5 in `Test-Installer.ps1` prüft einen frei gewählten Ordner im Laufwerksstamm.
+- **#48, Registry ([Issue #48](https://github.com/Celestial0579/lagerfeuer/issues/48), `52bef30`, baut auf #46 auf):**
+  - Der Schlüssel liegt jetzt unter `Software\Celestial0579\Lagerfeuer`.
+  - Fehlt er beim Update, übernimmt das Setup den Installationsordner aus dem alten Schlüssel und löscht diesen danach. Ohne das würde der Updater, der das Setup ohne `/D` aufruft, in einen frei gewählten Ordner nicht mehr zurückfinden.
+  - Die Deinstallation löscht beide Schlüssel und `Software\Celestial0579`, wenn der leer ist.
+  - Die App liest den Schlüssel nicht und bleibt unverändert. Schritt 6 in `Test-Installer.ps1` prüft den Umzug.
+- **Lokal geprüft:** Build ohne Warnungen, alle 559 Tests grün, `pwsh`-Parse sauber. Das eigentliche Setup läuft erst in der VM, weil NSIS auf dem Host fehlt.
+
+Für das VM-Fenster ist alles vorbereitet:
+- `skripte/lauf-46-48.sh` baut den Stand als 0.2.5 und führt `Test-Installer -SkipOld` als normaler Benutzer aus.
+- `update-024.ps1` aktualisiert von 0.2.4, in den Vorgabeordner, in einen eigenen Ordner im Profil und in einen im Laufwerksstamm. Das Setup von 0.2.4 ist geladen, die Prüfsumme stimmt mit dem Release überein.
+
+Nach dem Lauf pushe ich jeden Zweig einmal und öffne die beiden PRs. #45 (Cache-Warnung) wartet weiter auf die Entscheidung des Chefs.
