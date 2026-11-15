@@ -146,5 +146,38 @@ class DepescheTest(unittest.TestCase):
         self.assertNotIn("{{", text)
 
 
+class SkillZipTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.g = depesche.lade_glossar(BEISPIEL)
+
+    def test_zip_aufbau(self):
+        import tempfile
+        import zipfile
+        with tempfile.TemporaryDirectory() as d:
+            ziel = os.path.join(d, "x", "depesche.zip")
+            text = depesche.skill_text(self.g)
+            depesche.schreibe_zip(text, ziel)
+            with zipfile.ZipFile(ziel) as z:
+                self.assertEqual(z.namelist(), ["depesche/", "depesche/SKILL.md"])
+                self.assertEqual(z.read("depesche/SKILL.md").decode("utf-8"), text)
+            with open(ziel, "rb") as f:
+                erst = f.read()
+            depesche.schreibe_zip(text, ziel)
+            with open(ziel, "rb") as f:
+                self.assertEqual(f.read(), erst)  # gleiche Bytes bei gleichem Inhalt
+
+    def test_skill_erfuellt_upload_regeln(self):
+        self.assertEqual(depesche.pruefe_skill(depesche.skill_text(self.g), "depesche"), [])
+
+    def test_upload_regeln_greifen(self):
+        lang = "x" * 201
+        f = depesche.pruefe_skill(f"---\nname: My_Claude\ndescription: {lang}\n---\n", "depesche")
+        self.assertEqual(len(f), 4)  # Zeichen, claude, Ordnername, Länge
+        f = depesche.pruefe_skill("---\nname: depesche\ndescription: a <b> c\n---\n", "depesche")
+        self.assertEqual(len(f), 1)
+        self.assertTrue(depesche.pruefe_skill("kein Frontmatter", "depesche"))
+
+
 if __name__ == "__main__":
     unittest.main()

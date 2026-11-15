@@ -23,3 +23,7 @@ jobs:
         run: python3 depesche.py check messung/e2.txt
       - name: Skill erzeugen
         run: python3 depesche.py skill - > /dev/null
+      - name: Skill-Zip bauen und prüfen
+        run: |
+          python3 depesche.py skill --zip
+          test "$(unzip -Z1 skill/depesche.zip)" = "$(printf 'depesche/\ndepesche/SKILL.md')"

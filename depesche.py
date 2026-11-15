@@ -6,6 +6,7 @@ Aufrufe:
   depesche.py check [DATEI ...]       Aufbau, Codes, Zeichen und Stil prüfen, Rückgabe 1 nur bei Fehlern
   depesche.py stats DATEI ...         Zeichen, Wörter und Zeilen zählen
   depesche.py skill [ZIEL|-]          SKILL.md erzeugen, Vorgabe ~/.claude/skills/depesche/SKILL.md
+  depesche.py skill --zip [ZIEL]      Zip für den Import in Claude Desktop, Vorgabe skill/depesche.zip
 Ohne DATEI liest das Werkzeug von der Standardeingabe. Es braucht nur die Python-Standardbibliothek.
 
 Der Teamteil (eigene Regeln, Pfade, Wörter) kommt aus --team, sonst aus $DEPESCHE_TEAM,
@@ -325,7 +326,15 @@ def stats(args, g):
         print(f"{name}: {z} Zeichen, {len(text.split())} Wörter, {text.count(chr(10))} Zeilen{anteil}")
 
 
-def skill(args, g):
+# Upload-Regeln für Skills in Claude (claude.ai, Claude Desktop), Stand 15.11.2026:
+# Zip mit dem Skill-Ordner als Wurzel, Ordnername = name; name höchstens 64 Zeichen aus a-z, 0-9 und -,
+# ohne "anthropic" und "claude"; description nicht leer, höchstens 200 Zeichen (Hilfe-Center, die API
+# erlaubt 1024), ohne XML-Tags. Spitze Klammern meidet das Werkzeug ganz.
+NAME_MAX, BESCHREIBUNG_MAX = 64, 200
+ZIP_ZIEL = os.path.join(HIER, "skill", NAME.lower() + ".zip")
+
+
+def skill_text(g):
     def reihe(art, sp="en"):
         # Codes, die ihre eigene Bedeutung sind (next=next, ci=CI), stehen ohne Erklärung da
         return "; ".join(c if v[sp].lower() == c.lower() else f"{c}={v[sp]}" for c, v in g.get(art, {}).items())
@@ -341,17 +350,66 @@ def skill(args, g):
     with open(os.path.join(HIER, "spec.md"), encoding="utf-8") as f:
         text = f.read()
     text = text.replace("{{NAME}}", NAME).replace("{{KENNUNG}}", KENNUNG).replace("{{GLOSSAR}}", glossar)
-    kopfteil = (f"---\nname: {NAME.lower()}\ndescription: {NAME} ({KENNUNG}) compact message protocol, team-lead <-> "
-                f"staff Claude sessions. Use for every SendMessage between them and to read messages starting {KENNUNG}."
-                f"\n---\n\n")
+    kopfteil = (f"---\nname: {NAME.lower()}\ndescription: {NAME} ({KENNUNG}) compact message protocol between team-lead "
+                f"and staff Claude sessions. Use for every SendMessage between them and to read messages starting "
+                f"{KENNUNG}.\n---\n\n")
+    return kopfteil + text
+
+
+def pruefe_skill(text, ordner):
+    """Prüft SKILL.md gegen die Upload-Regeln. Gibt eine Liste von Fehlern zurück."""
+    m = re.match(r"---\n(.*?)\n---\n", text, re.S)
+    if not m:
+        return ["SKILL.md beginnt nicht mit YAML-Frontmatter (---)"]
+    felder = dict(z.split(": ", 1) for z in m.group(1).splitlines() if ": " in z)
+    name, beschreibung = felder.get("name", ""), felder.get("description", "")
+    fehler = []
+    if not re.fullmatch(r"[a-z0-9-]{1,%d}" % NAME_MAX, name):
+        fehler.append(f"name {name!r}: 1-{NAME_MAX} Zeichen aus a-z, 0-9, -")
+    if "anthropic" in name.lower() or "claude" in name.lower():
+        fehler.append(f"name {name!r} darf anthropic oder claude nicht enthalten")
+    if name != ordner:
+        fehler.append(f"name {name!r} muss dem Ordnernamen {ordner!r} gleichen")
+    if not beschreibung or len(beschreibung) > BESCHREIBUNG_MAX:
+        fehler.append(f"description: 1-{BESCHREIBUNG_MAX} Zeichen, hat {len(beschreibung)}")
+    if re.search(r"[<>]", beschreibung):
+        fehler.append("description ohne spitze Klammern (XML-Tags verboten)")
+    return fehler
+
+
+def schreibe_zip(text, ziel):
+    """Zip mit dem Ordner NAME/ als Wurzel und SKILL.md darin, feste Zeitstempel für gleiche Bytes."""
+    import zipfile
+    ordner = NAME.lower()
+    fehler = pruefe_skill(text, ordner)
+    if fehler:
+        sys.exit("Skill entspricht nicht den Upload-Regeln:\n" + "\n".join(fehler))
+    os.makedirs(os.path.dirname(os.path.abspath(ziel)), exist_ok=True)
+    with zipfile.ZipFile(ziel, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr(zipfile.ZipInfo(ordner + "/", (1980, 1, 1, 0, 0, 0)), "")
+        info = zipfile.ZipInfo(ordner + "/SKILL.md", (1980, 1, 1, 0, 0, 0))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        z.writestr(info, text.encode("utf-8"))
+
+
+def skill(args, g):
+    text = skill_text(g)
+    if getattr(args, "zip", False):
+        ziel = args.ziel or ZIP_ZIEL
+        schreibe_zip(text, ziel)
+        print(f"geschrieben: {ziel} (Ordner {NAME.lower()}/, Teamteil {team_datei(args.team)})")
+        return
+    fehler = pruefe_skill(text, NAME.lower())
+    if fehler:
+        sys.exit("Skill entspricht nicht den Upload-Regeln:\n" + "\n".join(fehler))
     if args.ziel == "-":
-        sys.stdout.write(kopfteil + text)
+        sys.stdout.write(text)
         return
     ziel = args.ziel or SKILL_ZIEL
     os.makedirs(os.path.dirname(ziel), exist_ok=True)
     with open(ziel, "w", encoding="utf-8") as f:
-        f.write(kopfteil + text)
-    print(f"geschrieben: {ziel} ({len(kopfteil + text)} Zeichen, Teamteil {team_datei(args.team)})")
+        f.write(text)
+    print(f"geschrieben: {ziel} ({len(text)} Zeichen, Teamteil {team_datei(args.team)})")
 
 
 def main():
@@ -365,7 +423,8 @@ def main():
     c.add_argument("datei", nargs="*")
     s = sub.add_parser("stats", help="Zeichen und Wörter zählen")
     s.add_argument("datei", nargs="+")
-    k = sub.add_parser("skill", help="SKILL.md erzeugen")
+    k = sub.add_parser("skill", help="SKILL.md oder Zip für den Import in Claude erzeugen")
+    k.add_argument("--zip", action="store_true", help="Zip für Claude Desktop/claude.ai, Vorgabe skill/depesche.zip")
     k.add_argument("ziel", nargs="?", help="Zieldatei oder - für die Standardausgabe")
     args = p.parse_args()
     g = lade_glossar(args.team)
