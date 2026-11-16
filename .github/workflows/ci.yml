@@ -27,3 +27,11 @@ jobs:
         run: |
           python3 depesche.py skill --zip
           test "$(unzip -Z1 skill/depesche.zip)" = "$(printf 'depesche/\ndepesche/SKILL.md')"
+          python3 depesche.py verify skill/depesche.zip
+      - name: Öffentliche Zip wie im Release (nur Kern)
+        run: |
+          python3 depesche.py --kern skill --zip dist/depesche.zip
+          python3 depesche.py --kern verify dist/depesche.zip
+          if python3 depesche.py --kern verify skill/depesche.zip > /dev/null; then
+            echo "::error::Zip mit Teamteil gilt als öffentlich"; exit 1
+          fi

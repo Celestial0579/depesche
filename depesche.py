@@ -7,6 +7,8 @@ Aufrufe:
   depesche.py stats DATEI ...         Zeichen, Wörter und Zeilen zählen
   depesche.py skill [ZIEL|-]          SKILL.md erzeugen, Vorgabe ~/.claude/skills/depesche/SKILL.md
   depesche.py skill --zip [ZIEL]      Zip für den Import in Claude Desktop, Vorgabe skill/depesche.zip
+  depesche.py verify ZIP ...          Skill-Zip prüfen: Aufbau und Upload-Regeln
+  depesche.py --kern skill --zip ZIEL öffentlicher Build nur aus dem Kern, bricht bei Teamteil oder privaten Spuren ab
 Ohne DATEI liest das Werkzeug von der Standardeingabe. Es braucht nur die Python-Standardbibliothek.
 
 Der Teamteil (eigene Regeln, Pfade, Wörter) kommt aus --team, sonst aus $DEPESCHE_TEAM,
@@ -55,9 +57,10 @@ MARKER = {"en": set("and not is are with for to of on after or if then also only
           "de": set("und nicht ist sind mit für zu auf nach oder wenn dann auch nur noch bei vor kein keine".split())}
 
 
-def lade_glossar(team=None):
+def lade_glossar(team=None, nur_kern=False):
+    """Kern plus Teamteil; nur_kern=True lässt den Teamteil weg (öffentlicher Build)."""
     g = {}
-    for datei in (KERN, team_datei(team)):
+    for datei in (KERN,) if nur_kern else (KERN, team_datei(team)):
         with open(datei, encoding="utf-8") as f:
             for nr, zeile in enumerate(f, 1):
                 zeile = zeile.rstrip("\n")
@@ -339,14 +342,9 @@ def skill_text(g):
         # Codes, die ihre eigene Bedeutung sind (next=next, ci=CI), stehen ohne Erklärung da
         return "; ".join(c if v[sp].lower() == c.lower() else f"{c}={v[sp]}" for c, v in g.get(art, {}).items())
 
-    glossar = "\n".join([
-        "- TYPE: " + reihe("typ"),
-        "- status: " + reihe("status"),
-        "- fields: " + reihe("feld"),
-        "- rules: " + reihe("regel"),
-        "- paths: " + reihe("pfad", "de"),
-        "- words: " + reihe("wort"),
-    ])
+    zeilen = [("TYPE", reihe("typ")), ("status", reihe("status")), ("fields", reihe("feld")),
+              ("rules", reihe("regel")), ("paths", reihe("pfad", "de")), ("words", reihe("wort"))]
+    glossar = "\n".join(f"- {titel}: {inhalt}" for titel, inhalt in zeilen if inhalt)
     with open(os.path.join(HIER, "spec.md"), encoding="utf-8") as f:
         text = f.read()
     text = text.replace("{{NAME}}", NAME).replace("{{KENNUNG}}", KENNUNG).replace("{{GLOSSAR}}", glossar)
@@ -377,6 +375,47 @@ def pruefe_skill(text, ordner):
     return fehler
 
 
+# Öffentlicher Build: nur Kern-Codes im Glossar, keine privaten Spuren. Namen prüft die Liste nicht,
+# sie stünden sonst selbst im Repo; der Kern-Abgleich schließt Teamregeln, -pfade und -wörter aus.
+PRIVAT = [(re.compile(r"~/|/home/|/Users/|[A-Za-z]:\\Users\\"), "Benutzerpfad"),
+          (re.compile(r"\blocal_[0-9a-f]{8}"), "Sitzungs-ID"),
+          (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b"), "IP-Adresse"),
+          (re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), "Mailadresse"),
+          (re.compile(r"\$[A-Z]="), "Pfadcode")]
+
+
+def pruefe_oeffentlich(text):
+    """Fehlerliste, wenn SKILL.md mehr als den Kern enthält oder private Spuren trägt."""
+    with open(KERN, encoding="utf-8") as f:
+        kern = {z.split("\t")[0] for z in f if z.strip() and not z.startswith("#")}
+    fehler = []
+    glossar = text.split("\nGlossary\n", 1)[1] if "\nGlossary\n" in text else ""
+    for zeile in glossar.splitlines():
+        titel, _, inhalt = zeile.partition(": ")
+        if titel not in ("- TYPE", "- status", "- fields"):
+            fehler.append(f"Glossarzeile außerhalb des Kerns: {titel or zeile!r}")
+            continue
+        for eintrag in inhalt.split("; "):
+            code = eintrag.split("=", 1)[0]
+            if code not in kern:
+                fehler.append(f"Code {code!r} steht nicht im Kern")
+    for muster, was in PRIVAT:
+        for m in muster.finditer(text):
+            fehler.append(f"{was}: {m.group(0)!r}")
+    return fehler
+
+
+def lies_zip(pfad):
+    """Liest eine Skill-Zip; gibt (SKILL.md-Text, Fehlerliste zum Aufbau) zurück."""
+    import zipfile
+    ordner = NAME.lower()
+    with zipfile.ZipFile(pfad) as z:
+        namen = z.namelist()
+        fehler = [] if namen == [ordner + "/", ordner + "/SKILL.md"] else [f"Zip-Inhalt {namen}, erwartet {ordner}/ und {ordner}/SKILL.md"]
+        text = z.read(ordner + "/SKILL.md").decode("utf-8") if ordner + "/SKILL.md" in namen else ""
+    return text, fehler
+
+
 def schreibe_zip(text, ziel):
     """Zip mit dem Ordner NAME/ als Wurzel und SKILL.md darin, feste Zeitstempel für gleiche Bytes."""
     import zipfile
@@ -394,10 +433,14 @@ def schreibe_zip(text, ziel):
 
 def skill(args, g):
     text = skill_text(g)
+    if getattr(args, "kern", False):
+        fehler = pruefe_oeffentlich(text)
+        if fehler:
+            sys.exit("öffentlicher Build enthält mehr als den Kern:\n" + "\n".join(fehler))
     if getattr(args, "zip", False):
         ziel = args.ziel or ZIP_ZIEL
         schreibe_zip(text, ziel)
-        print(f"geschrieben: {ziel} (Ordner {NAME.lower()}/, Teamteil {team_datei(args.team)})")
+        print(f"geschrieben: {ziel} (Ordner {NAME.lower()}/, {teil(args)})")
         return
     fehler = pruefe_skill(text, NAME.lower())
     if fehler:
@@ -409,12 +452,35 @@ def skill(args, g):
     os.makedirs(os.path.dirname(ziel), exist_ok=True)
     with open(ziel, "w", encoding="utf-8") as f:
         f.write(text)
-    print(f"geschrieben: {ziel} ({len(text)} Zeichen, Teamteil {team_datei(args.team)})")
+    print(f"geschrieben: {ziel} ({len(text)} Zeichen, {teil(args)})")
+
+
+def teil(args):
+    return "nur Kern" if getattr(args, "kern", False) else f"Teamteil {team_datei(args.team)}"
+
+
+def verify(args, g):
+    """Prüft fertige Skill-Zips: Aufbau, Upload-Regeln, mit --kern auch öffentlich."""
+    rc = 0
+    for pfad in args.datei:
+        text, fehler = lies_zip(pfad)
+        if text:
+            fehler += pruefe_skill(text, NAME.lower())
+            if args.kern:
+                fehler += pruefe_oeffentlich(text)
+        for f in fehler:
+            print(f"{pfad}: {f}")
+        if fehler:
+            rc = 1
+        else:
+            print(f"{pfad}: ok ({'öffentlich, nur Kern' if args.kern else 'Aufbau und Upload-Regeln'})")
+    return rc
 
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--team", help="Pfad zum Teamteil (glossar-team.tsv)")
+    p.add_argument("--kern", action="store_true", help="nur allgemeiner Teil, ohne Teamteil (öffentlicher Build)")
     sub = p.add_subparsers(dest="befehl", required=True)
     e = sub.add_parser("expand", help="in Klartext übersetzen")
     e.add_argument("--en", action="store_true", help="englischer Klartext statt deutschem")
@@ -426,9 +492,11 @@ def main():
     k = sub.add_parser("skill", help="SKILL.md oder Zip für den Import in Claude erzeugen")
     k.add_argument("--zip", action="store_true", help="Zip für Claude Desktop/claude.ai, Vorgabe skill/depesche.zip")
     k.add_argument("ziel", nargs="?", help="Zieldatei oder - für die Standardausgabe")
+    v = sub.add_parser("verify", help="Skill-Zip prüfen (mit --kern: öffentlich, nur Kern)")
+    v.add_argument("datei", nargs="+")
     args = p.parse_args()
-    g = lade_glossar(args.team)
-    rc = {"expand": expand, "check": check, "stats": stats, "skill": skill}[args.befehl](args, g)
+    g = lade_glossar(args.team, args.kern)
+    rc = {"expand": expand, "check": check, "stats": stats, "skill": skill, "verify": verify}[args.befehl](args, g)
     sys.exit(rc or 0)
 
 
