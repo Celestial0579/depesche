@@ -99,9 +99,21 @@ Regelkürzel schreibt der Übersetzer aus, `R vm` etwa zu „Regel vm (Nur eine 
 
 ### Als Skill in Claude Desktop oder claude.ai importieren
 
-1. `./depesche.py skill --zip` baut `skill/depesche.zip` aus Kern und eigenem Teamteil. Der Ordner `skill/` steht in `.gitignore`: Die Zip enthält den privaten Teamteil und gehört in kein Repo.
-2. In Claude (Desktop oder claude.ai): Seitenleiste **Customize** → **Skills** → **+** → **Upload a skill**, dann die Zip wählen.
-3. Den Skill in der Liste einschalten. Skills brauchen die Code-Ausführung: bei Einzelplänen unter **Settings → Capabilities**.
+**Fertige Zip aus dem Release** (ohne Python, ohne Klonen):
+
+1. Unter [Releases](https://github.com/Celestial0579/depesche/releases) `depesche.zip` und `SHA256SUMS.txt` herunterladen.
+2. Prüfen (optional): `sha256sum -c SHA256SUMS.txt` und `gh attestation verify depesche.zip --repo Celestial0579/depesche`.
+3. In Claude (Desktop oder claude.ai): Seitenleiste **Customize** → **Skills** → **+** → **Upload a skill**, dann die Zip wählen.
+4. Den Skill in der Liste einschalten. Skills brauchen die Code-Ausführung: bei Einzelplänen unter **Settings → Capabilities**.
+
+Die Release-Zip enthält nur den allgemeinen Teil (Typen, Status, Felder). Eigene Regeln (`R`), Pfade (`$X`) und Wörter fehlen; wer sie braucht, baut die Zip selbst.
+
+**Eigene Zip mit Teamteil** (nur lokal):
+
+1. `./depesche.py skill --zip` baut `skill/depesche.zip` aus Kern und eigenem Teamteil. Der Ordner `skill/` steht in `.gitignore`: Die Zip enthält den privaten Teamteil und gehört in kein Repo und in kein Release.
+2. Import wie oben ab Schritt 3.
+
+**Release bauen:** Ein Tag `vX.Y.Z` auf einem Commit von `main` startet `.github/workflows/release.yml`. Der Lauf baut die Zip mit `./depesche.py --kern skill --zip` nur aus dem Kern, bricht ab, wenn sie Teamregeln, -pfade, -wörter oder private Spuren (Benutzerpfade, Sitzungs-IDs, IP- oder Mailadressen) enthält, und legt `depesche.zip`, `SHA256SUMS.txt` und einen Herkunftsnachweis an. Tags mit Bindestrich (`v1.0.0-beta.1`) werden Vorabversionen.
 
 Das Werkzeug prüft beim Bauen die Upload-Regeln aus der Hilfe von Anthropic (Stand 15.11.2026):
 - Die Zip enthält den Ordner `depesche/` als Wurzel, darin `SKILL.md`. Der Ordnername gleicht dem `name` im Frontmatter.
@@ -119,6 +131,7 @@ Quellen: [How to create custom skills](https://support.claude.com/en/articles/12
 | `spec.md` | Vorlage der Regeln für die Sitzungen, englisch und knapp |
 | `depesche.py` | Übersetzer, Prüfer, Zähler und Skill-Erzeuger, nur Python-Standardbibliothek |
 | `tests/` | Tests, laufen in der CI |
+| `.github/workflows/release.yml` | baut bei Tags `v*` die öffentliche Zip und das Release |
 | `messung/` | die fünf Proben in vier Fassungen und eine leere Datei; Zeilen mit `===` trennen die Proben |
 
 Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kommen nur dort hinein, danach wird die Skill-Datei neu erzeugt. Codes, deren englische Bedeutung der Code selbst ist (`next`, `ci`, `risk`), stehen in `SKILL.md` ohne Erklärung.
@@ -133,6 +146,9 @@ Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kom
 ./depesche.py stats DATEI ...         # Zeichen, Wörter und Zeilen vergleichen
 ./depesche.py skill [ZIEL|-]          # SKILL.md erzeugen
 ./depesche.py skill --zip [ZIEL]      # Zip für den Import in Claude, Vorgabe skill/depesche.zip
+./depesche.py verify ZIP ...          # Zip prüfen: Aufbau und Upload-Regeln
+./depesche.py --kern skill --zip ZIEL # öffentliche Zip nur aus dem Kern, wie im Release
+./depesche.py --kern verify ZIP ...   # dazu prüfen, dass nur der Kern drin ist
 ./depesche.py --team PFAD ...         # anderen Teamteil verwenden
 ```
 

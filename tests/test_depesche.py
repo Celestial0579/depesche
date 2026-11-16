@@ -179,5 +179,57 @@ class SkillZipTest(unittest.TestCase):
         self.assertTrue(depesche.pruefe_skill("kein Frontmatter", "depesche"))
 
 
+class OeffentlicherBuildTest(unittest.TestCase):
+    """Release-Zip: nur Kern, kein Teamteil, keine privaten Spuren."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.kern = depesche.lade_glossar(nur_kern=True)
+        cls.text = depesche.skill_text(cls.kern)
+
+    def test_kern_ohne_teamteil(self):
+        for art in ("regel", "pfad"):
+            self.assertEqual(self.kern[art], {})
+        self.assertNotIn("wort", self.kern)
+        self.assertNotIn("- rules:", self.text)
+        self.assertNotIn("- paths:", self.text)
+        self.assertNotIn("- words:", self.text)
+
+    def test_kern_skill_ist_oeffentlich(self):
+        self.assertEqual(depesche.pruefe_oeffentlich(self.text), [])
+        self.assertEqual(depesche.pruefe_skill(self.text, "depesche"), [])
+
+    def test_teamteil_faellt_auf(self):
+        fehler = depesche.pruefe_oeffentlich(depesche.skill_text(depesche.lade_glossar(BEISPIEL)))
+        self.assertIn("Glossarzeile außerhalb des Kerns: '- rules'", fehler)
+        self.assertTrue(any(f.startswith("Pfadcode") for f in fehler))
+
+    def test_private_spuren_fallen_auf(self):
+        for spur in ("~/notes", "/home/x", "local_0123abcd", "10.0.0.1", "a.b@example.org"):
+            self.assertTrue(depesche.pruefe_oeffentlich(self.text + spur), spur)
+        fremd = self.text.replace("- fields: did=done", "- fields: zz=x; did=done")
+        self.assertIn("Code 'zz' steht nicht im Kern", depesche.pruefe_oeffentlich(fremd))
+
+    def test_verify_prueft_zip_aufbau(self):
+        import tempfile
+        import zipfile
+        with tempfile.TemporaryDirectory() as d:
+            gut = os.path.join(d, "gut.zip")
+            depesche.schreibe_zip(self.text, gut)
+            self.assertEqual(depesche.lies_zip(gut), (self.text, []))
+            schlecht = os.path.join(d, "schlecht.zip")
+            with zipfile.ZipFile(schlecht, "w") as z:
+                z.writestr("depesche/SKILL.md", self.text)
+                z.writestr("depesche/glossar-team.tsv", "x")
+            self.assertEqual(len(depesche.lies_zip(schlecht)[1]), 1)
+
+            class A:
+                datei, kern = [gut], True
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(depesche.verify(A, self.kern), 0)
+                A.datei = [schlecht]
+                self.assertEqual(depesche.verify(A, self.kern), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
