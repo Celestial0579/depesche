@@ -142,7 +142,7 @@ class DepescheTest(unittest.TestCase):
         self.assertTrue(text.startswith("---\nname: depesche\n"))
         self.assertIn("- rules: push=", text)
         self.assertIn("; next;", text)  # Code ohne eigene Erklärung
-        self.assertLess(len(text), 2600)
+        self.assertLess(len(text), 2850)  # mit Regeln 7 und 8 (Herkunft von Nachrichten)
         self.assertNotIn("{{", text)
 
 
