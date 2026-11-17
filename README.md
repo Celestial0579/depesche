@@ -132,7 +132,7 @@ Quellen: [How to create custom skills](https://support.claude.com/en/articles/12
 | `depesche.py` | Übersetzer, Prüfer, Zähler und Skill-Erzeuger, nur Python-Standardbibliothek |
 | `tests/` | Tests, laufen in der CI |
 | `.github/workflows/release.yml` | baut bei Tags `v*` die öffentliche Zip und das Release |
-| `messung/` | die fünf Proben in vier Fassungen und eine leere Datei; Zeilen mit `===` trennen die Proben |
+| `messung/` | die fünf Proben in vier Fassungen und eine leere Datei; Zeilen mit `===` trennen die Proben. Die CI prüft sie mit `privat` auf private Spuren; erlaubt sind nur die Platzhalter `~/notizen/teamleiter` und `local_00000000` |
 
 Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kommen nur dort hinein, danach wird die Skill-Datei neu erzeugt. Codes, deren englische Bedeutung der Code selbst ist (`next`, `ci`, `risk`), stehen in `SKILL.md` ohne Erklärung.
 
@@ -147,6 +147,7 @@ Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kom
 ./depesche.py skill [ZIEL|-]          # SKILL.md erzeugen
 ./depesche.py skill --zip [ZIEL]      # Zip für den Import in Claude, Vorgabe skill/depesche.zip
 ./depesche.py verify ZIP ...          # Zip prüfen: Aufbau und Upload-Regeln
+./depesche.py privat [DATEI ...]      # Proben auf private Spuren prüfen: Pfade, Sitzungs-IDs, IP, Mail
 ./depesche.py --kern skill --zip ZIEL # öffentliche Zip nur aus dem Kern, wie im Release
 ./depesche.py --kern verify ZIP ...   # dazu prüfen, dass nur der Kern drin ist
 ./depesche.py --team PFAD ...         # anderen Teamteil verwenden

@@ -47,7 +47,7 @@ Ich habe in AppX die Dependabot-Sicherheitsupdates eingeschaltet. Dabei ist eine
 === S3
 Chef hat entschieden: Der P2V-Stick wird der vierte Weg im Rettungsassistenten, und das Projekt heißt künftig „Projekt B“.
 
-Der P2V-Stick ist der Assistent für den Umzug von echter Hardware in eine Proxmox-VM. Sein Stand liegt unter `~/Management/p2v-stick`.
+Der P2V-Stick ist der Assistent für den Umzug von echter Hardware in eine Proxmox-VM. Sein Stand liegt in einem eigenen Ordner.
 
 Umbenennung und Einbau übernimmt eine neue Sitzung. Dein Kontext steht schon bei 66 %, da wird jeder weitere Schritt teuer.
 
