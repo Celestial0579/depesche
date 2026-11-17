@@ -12,7 +12,9 @@ Aufrufe:
 Ohne DATEI liest das Werkzeug von der Standardeingabe. Es braucht nur die Python-Standardbibliothek.
 
 Der Teamteil (eigene Regeln, Pfade, Wörter) kommt aus --team, sonst aus $DEPESCHE_TEAM,
-sonst aus ~/.config/depesche/glossar-team.tsv, sonst aus beispiel/glossar-team.tsv.
+sonst aus ~/.config/depesche/glossar-team.tsv. Fehlt eine ausdrücklich genannte Datei, bricht das
+Werkzeug ab. Ohne eigenen Teamteil nimmt es beispiel/glossar-team.tsv und sagt das auf stderr;
+skill ohne --kern braucht dann ausdrücklich --team beispiel/glossar-team.tsv.
 """
 import argparse
 import os
@@ -24,16 +26,26 @@ HIER = os.path.dirname(os.path.abspath(__file__))
 NAME = "Depesche"
 KENNUNG = "DP1"  # steht am Anfang jeder Nachricht
 KERN = os.path.join(HIER, "glossar-kern.tsv")
-TEAM_ORTE = (os.path.expanduser("~/.config/depesche/glossar-team.tsv"),
-             os.path.join(HIER, "beispiel", "glossar-team.tsv"))
+TEAM_EIGEN = os.path.expanduser("~/.config/depesche/glossar-team.tsv")
+BEISPIEL = os.path.join(HIER, "beispiel", "glossar-team.tsv")
 SKILL_ZIEL = os.path.expanduser("~/.claude/skills/depesche/SKILL.md")
 
 
-def team_datei(angabe=None):
-    for p in (angabe, os.environ.get("DEPESCHE_TEAM")) + TEAM_ORTE:
-        if p and os.path.isfile(p):
+def team_datei(angabe=None, beispiel_erlaubt=True):
+    """Pfad zum Teamteil. Ausdrücklich genannt (--team, $DEPESCHE_TEAM) muss er da sein, sonst Abbruch.
+    Ohne eigenen Teamteil das Beispiel nur mit beispiel_erlaubt, und mit Hinweis auf stderr."""
+    for quelle, p in (("--team", angabe), ("DEPESCHE_TEAM", os.environ.get("DEPESCHE_TEAM"))):
+        if p:
+            if not os.path.isfile(p):
+                sys.exit(f"Teamteil aus {quelle} nicht gefunden: {p}")
             return p
-    sys.exit("kein Teamteil gefunden (--team, DEPESCHE_TEAM oder ~/.config/depesche/glossar-team.tsv)")
+    if os.path.isfile(TEAM_EIGEN):
+        return TEAM_EIGEN
+    if beispiel_erlaubt:
+        print(f"Hinweis: kein eigener Teamteil, nutze das Beispiel {BEISPIEL}", file=sys.stderr)
+        return BEISPIEL
+    sys.exit("kein eigener Teamteil (--team, DEPESCHE_TEAM oder ~/.config/depesche/glossar-team.tsv); "
+             "das Beispiel nur ausdrücklich mit --team beispiel/glossar-team.tsv")
 
 REGEL_IM_TEXT = re.compile(r"(?<![\w$])R ([a-z]+(?:,[a-z]+)*)\b")
 PFAD = re.compile(r"\$[A-Z]\b")
@@ -57,10 +69,10 @@ MARKER = {"en": set("and not is are with for to of on after or if then also only
           "de": set("und nicht ist sind mit für zu auf nach oder wenn dann auch nur noch bei vor kein keine".split())}
 
 
-def lade_glossar(team=None, nur_kern=False):
+def lade_glossar(team=None, nur_kern=False, beispiel_erlaubt=True):
     """Kern plus Teamteil; nur_kern=True lässt den Teamteil weg (öffentlicher Build)."""
     g = {}
-    for datei in (KERN,) if nur_kern else (KERN, team_datei(team)):
+    for datei in (KERN,) if nur_kern else (KERN, team_datei(team, beispiel_erlaubt)):
         with open(datei, encoding="utf-8") as f:
             for nr, zeile in enumerate(f, 1):
                 zeile = zeile.rstrip("\n")
@@ -456,7 +468,7 @@ def skill(args, g):
 
 
 def teil(args):
-    return "nur Kern" if getattr(args, "kern", False) else f"Teamteil {team_datei(args.team)}"
+    return "nur Kern" if getattr(args, "kern", False) else f"Teamteil {team_datei(args.team, False)}"
 
 
 def verify(args, g):
@@ -495,7 +507,8 @@ def main():
     v = sub.add_parser("verify", help="Skill-Zip prüfen (mit --kern: öffentlich, nur Kern)")
     v.add_argument("datei", nargs="+")
     args = p.parse_args()
-    g = lade_glossar(args.team, args.kern)
+    # skill richtet die Depesche für alle neuen Sitzungen ein: das Beispiel dort nur ausdrücklich
+    g = lade_glossar(args.team, args.kern, beispiel_erlaubt=not (args.befehl == "skill" and not args.kern))
     rc = {"expand": expand, "check": check, "stats": stats, "skill": skill, "verify": verify}[args.befehl](args, g)
     sys.exit(rc or 0)
 

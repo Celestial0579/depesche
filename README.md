@@ -154,6 +154,8 @@ Die Glossare haben die Spalten Code, Art, Deutsch und Englisch. Neue Kürzel kom
 
 Ohne Datei liest das Werkzeug von der Standardeingabe.
 
+Den Teamteil sucht es in `--team`, dann in `$DEPESCHE_TEAM`, dann unter `~/.config/depesche/glossar-team.tsv`. Fehlt eine ausdrücklich genannte Datei, bricht es ab. Ohne eigenen Teamteil nimmt es `beispiel/glossar-team.tsv` und sagt das auf stderr. `skill` ohne `--kern` bricht dann ab, damit nicht still das Beispiel für alle Sitzungen eingerichtet wird; das Beispiel geht dort nur ausdrücklich mit `--team beispiel/glossar-team.tsv`.
+
 `check` meldet **Fehler** (Rückgabewert 1): unbekannter Typ, unbekannte Regel oder unbekannter Pfad, Bericht ohne Status, keine Kopfzeile.
 
 Dazu **Hinweise** (Rückgabewert bleibt 0):
