@@ -18,7 +18,7 @@ FYI DSU jetzt an
 DO $N/windows-pruefliste.md: prüfen, nur Lücken -> #47 oder eigenes Issue, Umsetzung nach 1.1.0, Teil A zuerst (lokale API, Updater)
 === S3
 DP1 DO handover
-src boss: P2V-Stick (Hardware -> Proxmox-VM, ~/Management/p2v-stick) = vierter Weg im Rettungsassistenten, Projektname Projekt B
+src boss: P2V-Stick (Hardware -> Proxmox-VM, eigener Ordner) = vierter Weg im Rettungsassistenten, Projektname Projekt B
 why neue Sitzung macht Umbenennung + Einbau; dein Kontext 66% -> jeder Schritt teuer
 - Beta .6 durchlaufen lassen (Bau 21:12Z lief um 22:23 noch), dann ci-gruen-pruefen.sh
 - 1 PR: Node-24-Actions per SHA (wie aufgelöst) + .github/dependabot.yml (github-actions) + SECURITY.md (-> private Meldung, seit heute an, keine Zusagen zu Antwortzeit/CVE). R push. PR-Bau abwarten, bei Grün mergen, keine neue Beta

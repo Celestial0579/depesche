@@ -8,6 +8,7 @@ Aufrufe:
   depesche.py skill [ZIEL|-]          SKILL.md erzeugen, Vorgabe ~/.claude/skills/depesche/SKILL.md
   depesche.py skill --zip [ZIEL]      Zip für den Import in Claude Desktop, Vorgabe skill/depesche.zip
   depesche.py verify ZIP ...          Skill-Zip prüfen: Aufbau und Upload-Regeln
+  depesche.py privat [DATEI ...]      Proben auf private Spuren prüfen, Rückgabe 1 bei Funden
   depesche.py --kern skill --zip ZIEL öffentlicher Build nur aus dem Kern, bricht bei Teamteil oder privaten Spuren ab
 Ohne DATEI liest das Werkzeug von der Standardeingabe. Es braucht nur die Python-Standardbibliothek.
 
@@ -394,6 +395,31 @@ PRIVAT = [(re.compile(r"~/|/home/|/Users/|[A-Za-z]:\\Users\\"), "Benutzerpfad"),
           (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b"), "IP-Adresse"),
           (re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), "Mailadresse"),
           (re.compile(r"\$[A-Z]="), "Pfadcode")]
+# Platzhalter in den Proben (messung/): Beispielpfad des Teamteils und eine genullte Sitzungs-ID
+PLATZHALTER = ("~/notizen/teamleiter", "local_00000000")
+
+
+def private_spuren(text):
+    """(Zeile, Art, Treffer) je privater Spur nach PRIVAT, Platzhalter ausgenommen."""
+    funde = []
+    for muster, was in PRIVAT:
+        for m in muster.finditer(text):
+            if not any(text.startswith(p, m.start()) for p in PLATZHALTER):
+                funde.append((text.count("\n", 0, m.start()) + 1, was, m.group(0)))
+    return sorted(funde)
+
+
+def privat(args, g):
+    """Proben auf private Spuren prüfen: Benutzerpfade, Sitzungs-IDs, IP- und Mailadressen."""
+    rc = 0
+    for name, text in lies(args.datei):
+        funde = private_spuren(text)
+        for zeile, was, treffer in funde:
+            print(f"{name}:{zeile}: {was} {treffer!r}")
+        if not funde:
+            print(f"{name}: ok")
+        rc |= bool(funde)
+    return rc
 
 
 def pruefe_oeffentlich(text):
@@ -506,10 +532,14 @@ def main():
     k.add_argument("ziel", nargs="?", help="Zieldatei oder - für die Standardausgabe")
     v = sub.add_parser("verify", help="Skill-Zip prüfen (mit --kern: öffentlich, nur Kern)")
     v.add_argument("datei", nargs="+")
+    pv = sub.add_parser("privat", help="Proben auf private Spuren prüfen (Pfade, Sitzungs-IDs, IP, Mail)")
+    pv.add_argument("datei", nargs="*")
     args = p.parse_args()
     # skill richtet die Depesche für alle neuen Sitzungen ein: das Beispiel dort nur ausdrücklich
-    g = lade_glossar(args.team, args.kern, beispiel_erlaubt=not (args.befehl == "skill" and not args.kern))
-    rc = {"expand": expand, "check": check, "stats": stats, "skill": skill, "verify": verify}[args.befehl](args, g)
+    g = None if args.befehl == "privat" else lade_glossar(
+        args.team, args.kern, beispiel_erlaubt=not (args.befehl == "skill" and not args.kern))
+    rc = {"expand": expand, "check": check, "stats": stats, "skill": skill, "verify": verify,
+          "privat": privat}[args.befehl](args, g)
     sys.exit(rc or 0)
 
 

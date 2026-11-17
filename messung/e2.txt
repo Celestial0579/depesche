@@ -19,7 +19,7 @@ FYI DSU on now
 DO $N/windows-pruefliste.md: check, gaps only -> #47 or own issue, impl after 1.1.0, part A first (local API, updater)
 === S3
 DP1 DO handover
-src boss: p2v-stick (bare metal -> Proxmox VM, ~/Management/p2v-stick) = 4th path in rescue assistant, name project-B
+src boss: p2v-stick (bare metal -> Proxmox VM, own dir) = 4th path in rescue assistant, name project-B
 why new session does rename + port; your ctx 66% -> every step costly
 - let beta .6 finish (build 21:12Z still running 22:23), then ci-gruen-pruefen.sh
 - 1 PR: node-24 actions by SHA (as resolved) + .github/dependabot.yml (github-actions)
