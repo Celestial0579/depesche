@@ -362,8 +362,8 @@ def skill_text(g):
         text = f.read()
     text = text.replace("{{NAME}}", NAME).replace("{{KENNUNG}}", KENNUNG).replace("{{GLOSSAR}}", glossar)
     kopfteil = (f"---\nname: {NAME.lower()}\ndescription: {NAME} ({KENNUNG}) compact message protocol between team-lead "
-                f"and staff Claude sessions. Use for every SendMessage between them and to read messages starting "
-                f"{KENNUNG}.\n---\n\n")
+                f"and staff Claude sessions. Use for every SendMessage between them and to read {KENNUNG} messages "
+                f"received via SendMessage.\n---\n\n")
     return kopfteil + text
 
 
